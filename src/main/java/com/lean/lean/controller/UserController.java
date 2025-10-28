@@ -1,6 +1,5 @@
 package com.lean.lean.controller;
 
-import com.lean.lean.dao.LeanUser;
 import com.lean.lean.dao.User;
 import com.lean.lean.dto.AddUserDTO;
 import com.lean.lean.dto.UserDTO;

@@ -4,6 +4,8 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.sql.Timestamp;
+import java.time.LocalDateTime;
+
 @Entity
 @Data
 @NoArgsConstructor
@@ -23,8 +25,8 @@ public class TransactionHistory {
     @Enumerated(EnumType.STRING)
     private TransactionStatus status;
 
-    private Timestamp createdAt;
-    private Timestamp updatedAt;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
 
     public enum TransactionStatus {
         PENDING, COMPLETED, FAILED, CANCELLED

@@ -6,6 +6,7 @@ import lombok.NoArgsConstructor;
 
 import java.sql.Date;
 import java.sql.Timestamp;
+import java.time.LocalDateTime;
 
 @Entity
 @Data
@@ -35,7 +36,7 @@ public class User {
     private String phone;
 
     @Column(name = "CreatedAt")
-    private Timestamp createdAt;
+    private LocalDateTime createdAt;
     @Column(name = "UpdatedAt")
-    private Timestamp updatedAt;
+    private LocalDateTime updatedAt;
 }

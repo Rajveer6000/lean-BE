@@ -5,22 +5,31 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.sql.Timestamp;
+import java.time.LocalDateTime;
+
 @Entity
 @Data
 @NoArgsConstructor
+@Table(name = "lean_account_balance")
 public class LeanAccountBalance {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "Id")
     private Long id;
 
     @ManyToOne
-    @JoinColumn(name = "account_id", referencedColumnName = "id", nullable = false)
+    @JoinColumn(name = "AccountId", referencedColumnName = "id", nullable = false)
     private LeanAccount leanAccount;
 
+    @Column(name = "balance")
     private Double balance;
+    @Column(name = "CurrencyCode")
     private String currencyCode;
+    @Column(name = "AccountType")
     private AccountType accountType;
 
-    private Timestamp createdAt;
-    private Timestamp updatedAt;
+    @Column(name = "CreatedAt")
+    private LocalDateTime createdAt;
+    @Column(name = "UpdatedAt")
+    private LocalDateTime updatedAt;
 }
