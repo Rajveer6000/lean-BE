@@ -40,8 +40,8 @@ public class UserServiceImpl implements UserService {
         user.setDateOfBirth(addUserDTO.getDateOfBirth());
         user.setGender(addUserDTO.getGender());
         user.setPhone(addUserDTO.getPhone());
-        user.setCreatedAt(Timestamp.valueOf(LocalDateTime.now()));
-        user.setUpdatedAt(Timestamp.valueOf(LocalDateTime.now()));
+        user.setCreatedAt(LocalDateTime.now());
+        user.setUpdatedAt(LocalDateTime.now());
 
         User savedUser = userRepository.save(user);
 

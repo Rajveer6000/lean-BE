@@ -4,19 +4,29 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.sql.Timestamp;
+import java.time.LocalDateTime;
+
 @Entity
 @Data
 @NoArgsConstructor
+@Table(name = "lean_api_logs")
 public class LeanApiLog {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "Id")
     private Long id;
 
+    @Column(name = "Endpoint")
     private String endpoint;
+    @Column(name = "RequestBody")
     private String requestBody;
+    @Column(name = "ResponseBody")
     private String responseBody;
+    @Column(name = "StatusCode")
     private int statusCode;
+    @Column(name = "ErrorMessage")
     private String errorMessage;
 
-    private Timestamp createdAt;
+    @Column(name = "CreatedAt")
+    private LocalDateTime createdAt;
 }
