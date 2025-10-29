@@ -30,7 +30,7 @@ public class LeanEntity {
     private String permissions;
 
     @Column(name = "bank_id")
-    private String bankId;
+    private Long bankId;
 
     @Column(name = "created_at")
     private LocalDateTime createdAt;

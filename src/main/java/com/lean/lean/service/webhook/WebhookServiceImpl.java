@@ -101,7 +101,7 @@ public class WebhookServiceImpl implements WebhookService {
         boolean newEntity = (entity.getId() == null);
         entity.setEntityId(dto.getId());
         entity.setUserId(dto.getAppUserId());                 // app_user_id → user_id
-        entity.setBankId(bd.getIdentifier());                 // storing bank.identifier as String (per your schema)
+        entity.setBankId(bank.getId());                 // storing bank.identifier as String (per your schema)
         try {
             entity.setPermissions(objectMapper.writeValueAsString(dto.getPermissions())); // JSON string
         } catch (Exception e) {

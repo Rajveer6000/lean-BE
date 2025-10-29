@@ -18,6 +18,7 @@ public class PaymentController {
     @PostMapping("/webhook")
     public ResponseEntity<String> handleWebhook(@RequestBody WebHookRequestDto webhookPayloadDto) {
         log.info("Received webhook payload: {}", webhookPayloadDto);
+        webhookService.processWebhook(webhookPayloadDto);
         try {
             String json = new ObjectMapper()
                     .writerWithDefaultPrettyPrinter()
@@ -26,7 +27,6 @@ public class PaymentController {
         } catch (Exception e) {
             System.out.println("Failed to serialize webhook payload: " + e.getMessage());
         }
-        webhookService.processWebhook(webhookPayloadDto);
         return ResponseEntity.ok("Webhook processed successfully");
     }
 
