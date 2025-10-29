@@ -1,5 +1,7 @@
 package com.lean.lean.enums;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonValue;
 
 public enum Permission {
     IDENTITY("identity"),
@@ -18,10 +20,12 @@ public enum Permission {
         this.value = value;
     }
 
+    @JsonValue
     public String getValue() {
         return value;
     }
 
+    @JsonCreator
     public static Permission fromValue(String value) {
         for (Permission permission : Permission.values()) {
             if (permission.value.equalsIgnoreCase(value)) {
