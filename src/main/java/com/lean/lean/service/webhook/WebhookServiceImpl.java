@@ -34,23 +34,12 @@ public class WebhookServiceImpl implements WebhookService {
 //        Integer statusCode;
 //        String errMsg = null;
 //
-//        try {
-            // -------------------------------------------
-            // TODO: domain logic per event type
-            // switch (logRow.getEventType()) {
-            //   case "entity.created": handleEntityCreated(webhookPayloadDto); break;
-            //   // ...
-            // }
-            // Optionally set a structured 'response' object for observability:
-            // logRow.setResponse(Map.of("message", "processed", "at", Instant.now().toString()));
-            // leanWebhookLogRepository.save(logRow);
-            // -------------------------------------------
-//            statusCode = 200;
-//        } catch (Exception ex) {
-//            statusCode = 500;
-//            errMsg = truncate(safeMsg(ex), 2000); // keep within column limit
-//            log.error("Webhook processing failed: {}", errMsg, ex);
-//        }
+        try {
+//                Process the webhook payload here according to it type and content
+            log.info("Processing webhook: {}", logRow.getId());
+        } catch (Exception e) {
+            log.error("Error processing webhook {}: {}", logRow.getId(), e.getMessage());
+        }
         return leanWebhookLogRepository.findById(logRow.getId()).orElse(logRow);
     }
 }
