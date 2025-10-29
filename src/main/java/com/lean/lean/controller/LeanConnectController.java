@@ -16,4 +16,9 @@ public class LeanConnectController {
     public UserLeanConnectResponse connectUser(@RequestParam Long userId) {
         return userLeanService.connectUser(userId);
     }
+
+    @GetMapping("/leanUserDetails")
+    public Object getLeanUserDetails(@RequestParam Long userId) {
+        return userLeanService.getLeanUserDetails(userId);
+    }
 }

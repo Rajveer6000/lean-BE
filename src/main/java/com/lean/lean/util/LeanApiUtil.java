@@ -5,6 +5,7 @@ import com.lean.lean.dao.LeanApiLog;
 import com.lean.lean.dao.User;
 import com.lean.lean.dto.LeanCustomerRegResponse;
 import com.lean.lean.service.LeanApiLogService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -13,7 +14,7 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.http.*;
 import org.json.JSONObject;
-
+@Slf4j
 @Component
 public class LeanApiUtil {
     @Autowired
@@ -82,6 +83,18 @@ public class LeanApiUtil {
         return responseBody.getString("access_token");
     }
 
+    public Object getLeanUserDetails(String leanUserId, String accessToken) {
+        String url = apiUrl + "/data/v1/identity";
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("authorization", "Bearer " + accessToken);
+        String body = new JSONObject()
+                .put("entity_id", "3f8c62d3-ba0e-49bf-8509-003e9315e8a7")
+                .toString();
+        ResponseEntity<String> resp =
+                exchangeWithLog(url, HttpMethod.POST, headers, body, String.class);
+        JSONObject responseBody = new JSONObject(resp.getBody());
+        return responseBody.toMap();
+    }
     // ---------- Centralized logging wrapper ----------
 
     private <T> ResponseEntity<T> exchangeWithLog(
@@ -95,7 +108,10 @@ public class LeanApiUtil {
         LeanApiLog.LeanApiLogBuilder logBuilder = LeanApiLog.builder()
                 .endpoint(url)
                 .requestBody(maskedReq);
-
+        log.info("Making request to Lean API: {} {}", method, url);
+        log.info("Request Body: {}", maskedReq);
+        log.info("Headers: {}", logService.maskSecrets(headers.toString()));
+        log.info("Expected Response Type: {}", responseType.getSimpleName());
         try {
             HttpEntity<String> entity = new HttpEntity<>(requestBody, headers);
             ResponseEntity<T> response = restTemplate.exchange(url, method, entity, responseType);
