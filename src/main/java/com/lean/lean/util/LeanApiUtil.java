@@ -83,12 +83,48 @@ public class LeanApiUtil {
         return responseBody.getString("access_token");
     }
 
-    public Object getLeanUserDetails(String leanUserId, String accessToken) {
+    public Object getLeanUserDetails(String entityId, String accessToken) {
         String url = apiUrl + "/data/v1/identity";
         HttpHeaders headers = new HttpHeaders();
-        headers.set("authorization", "Bearer " + accessToken);
+        headers.set("Authorization", "Bearer " + accessToken);
+        headers.set("Accept", "*/*");
+        headers.set("Content-Type", "application/json");
+
         String body = new JSONObject()
-                .put("entity_id", "3f8c62d3-ba0e-49bf-8509-003e9315e8a7")
+                .put("entity_id", entityId)
+                .toString();
+        ResponseEntity<String> resp =
+                exchangeWithLog(url, HttpMethod.POST, headers, body, String.class);
+        JSONObject responseBody = new JSONObject(resp.getBody());
+        return responseBody.toMap();
+    }
+
+    public Object getUserAccounts(String entityId, String accessToken) {
+        String url = apiUrl + "/data/v1/accounts";
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Authorization", "Bearer " + accessToken);
+        headers.set("Accept", "*/*");
+        headers.set("Content-Type", "application/json");
+
+        String body = new JSONObject()
+                .put("entity_id", entityId)
+                .toString();
+        ResponseEntity<String> resp =
+                exchangeWithLog(url, HttpMethod.POST, headers, body, String.class);
+        JSONObject responseBody = new JSONObject(resp.getBody());
+        return responseBody.toMap();
+    }
+
+    public Object getAccountBalances(String entityId, String accountId, String accessToken) {
+        String url = apiUrl + "/data/v1/balance";
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Authorization", "Bearer " + accessToken);
+        headers.set("Accept", "*/*");
+        headers.set("Content-Type", "application/json");
+
+        String body = new JSONObject()
+                .put("entity_id", entityId)
+                .put("account_id", accountId)
                 .toString();
         ResponseEntity<String> resp =
                 exchangeWithLog(url, HttpMethod.POST, headers, body, String.class);

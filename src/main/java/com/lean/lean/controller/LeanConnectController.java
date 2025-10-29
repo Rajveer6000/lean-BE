@@ -17,8 +17,18 @@ public class LeanConnectController {
         return userLeanService.connectUser(userId);
     }
 
-    @GetMapping("/leanUserDetails")
+    @GetMapping("/UserDetails")
     public Object getLeanUserDetails(@RequestParam Long userId) {
         return userLeanService.getLeanUserDetails(userId);
+    }
+
+    @GetMapping("/userAccounts")
+    public Object getUserAccounts(@RequestParam Long userId) {
+        return userLeanService.getUserAccounts(userId);
+    }
+
+    @GetMapping("/accountBalances")
+    public Object getAccountBalances(@RequestParam Long userId, @RequestParam String accountId) {
+        return userLeanService.getAccountBalances(userId, accountId);
     }
 }
