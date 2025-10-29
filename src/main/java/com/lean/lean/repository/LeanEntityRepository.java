@@ -8,4 +8,5 @@ import java.util.Optional;
 @Repository
 public interface LeanEntityRepository extends JpaRepository<LeanEntity, Long> {
     Optional<LeanEntity> findByEntityId(String entityId);
+    Optional<LeanEntity> findByUserId(String userId);
 }
