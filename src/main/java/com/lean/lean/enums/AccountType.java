@@ -3,7 +3,9 @@ package com.lean.lean.enums;
 public enum AccountType {
     CURRENT("CURRENT"),
     SAVINGS("SAVINGS"),
-    CREDIT("CREDIT");
+    CREDIT("CREDIT"),
+    BUSINESS("BUSINESS"),
+    PERSONAL("PERSONAL");
 
     private final String value;
 
