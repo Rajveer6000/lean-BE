@@ -2,7 +2,6 @@ package com.lean.lean.common;
 
 import jakarta.servlet.*;
 import jakarta.servlet.http.HttpServletRequest;
-import org.apache.catalina.filters.CorsFilter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
@@ -12,6 +11,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.web.filter.CorsFilter;
 
 import java.io.IOException;
 import java.util.*;
@@ -39,22 +39,22 @@ public class PreProcessRequestFilter implements Filter {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(Collections.singletonList("*"));
+
+        configuration.setAllowedOriginPatterns(Collections.singletonList("*")); // Allow all origins (replace with specific domain if needed)
         configuration.setAllowedMethods(Arrays.asList("HEAD", "GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
-        //configuration.setAllowCredentials(true);
-        configuration.setMaxAge(3600L);
-        /*configuration.setAllowedHeaders(Arrays.asList(
-                "Accept", "Origin", "Content-Type", "Depth", "User-Agent", "If-Modified-Since,",
-                "Cache-Control", "Authorization", "X-Req", "X-File-Size", "X-Requested-With", "X-File-Name", "X-JWT-Assertion"));*/
-        configuration.setAllowedHeaders(Collections.singletonList("*"));
+        configuration.setAllowedHeaders(Arrays.asList("*")); // Allow all headers
+        configuration.setAllowCredentials(true); // Allow credentials (if needed)
+        configuration.setMaxAge(3600L); // Cache pre-flight requests for 1 hour
+
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
+
         return source;
     }
 
     @Bean
-    public FilterRegistrationBean<CorsFilter> corsFilterRegistrationBean() {
-        FilterRegistrationBean<CorsFilter> bean = new FilterRegistrationBean<>(new CorsFilter());
+    public FilterRegistrationBean<org.springframework.web.filter.CorsFilter> corsFilterRegistrationBean() {
+        FilterRegistrationBean<org.springframework.web.filter.CorsFilter> bean = new FilterRegistrationBean<>(new CorsFilter(corsConfigurationSource()));
         bean.setOrder(Ordered.HIGHEST_PRECEDENCE);
         return bean;
     }
