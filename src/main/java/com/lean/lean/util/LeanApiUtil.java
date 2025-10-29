@@ -1,16 +1,26 @@
 package com.lean.lean.util;
 
 
+import com.lean.lean.dao.LeanApiLog;
 import com.lean.lean.dao.User;
 import com.lean.lean.dto.LeanCustomerRegResponse;
+import com.lean.lean.service.LeanApiLogService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpStatusCodeException;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.http.*;
 import org.json.JSONObject;
 
 @Component
 public class LeanApiUtil {
+    @Autowired
+    private  RestTemplate restTemplate;
+
+    @Autowired
+    private LeanApiLogService logService;
 
     @Value("${lean.auth.api-url}")
     private String authApiUrl;
@@ -25,8 +35,6 @@ public class LeanApiUtil {
     private String clientId;
 
 
-    private final RestTemplate restTemplate = new RestTemplate();
-
     public String getAccessToken() {
         String url = authApiUrl + "/oauth2/token";
         HttpHeaders headers = new HttpHeaders();
@@ -37,29 +45,25 @@ public class LeanApiUtil {
                 "&grant_type=client_credentials" +
                 "&scope=api";
 
-        HttpEntity<String> entity = new HttpEntity<>(body, headers);
-        ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.POST, entity, String.class);
-
-        JSONObject responseBody = new JSONObject(response.getBody());
+        ResponseEntity<String> resp = exchangeWithLog(url, HttpMethod.POST, headers, body, String.class);
+        JSONObject responseBody = new JSONObject(resp.getBody());
         return responseBody.getString("access_token");
     }
 
-    // Method to create a customer on Lean platform
     public LeanCustomerRegResponse createCustomerOnLean(User user, String accessToken) {
-        String url = "https://sandbox.leantech.me/customers/v1";
+        String url = apiUrl + "/customers/v1";
         HttpHeaders headers = new HttpHeaders();
         headers.set("Authorization", "Bearer " + accessToken);
         headers.setContentType(MediaType.APPLICATION_JSON);
 
-        // Prepare the request body
         String body = new JSONObject()
                 .put("app_user_id", user.getId())
                 .toString();
 
-        HttpEntity<String> entity = new HttpEntity<>(body, headers);
-        ResponseEntity<LeanCustomerRegResponse> responseEntity = restTemplate.exchange(
-                url, HttpMethod.POST, entity, LeanCustomerRegResponse.class);
-        return responseEntity.getBody();
+        ResponseEntity<LeanCustomerRegResponse> resp =
+                exchangeWithLog(url, HttpMethod.POST, headers, body, LeanCustomerRegResponse.class);
+
+        return resp.getBody();
     }
 
     public String getAccessTokenForCustomer(String customerId) {
@@ -68,17 +72,73 @@ public class LeanApiUtil {
         headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
 
         String scope = "customer." + customerId;
-
         String body = "client_id=" + clientId +
                 "&client_secret=" + clientSecret +
                 "&grant_type=client_credentials" +
                 "&scope=" + scope;
 
-        HttpEntity<String> entity = new HttpEntity<>(body, headers);
-        ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.POST, entity, String.class);
-
-        JSONObject responseBody = new JSONObject(response.getBody());
+        ResponseEntity<String> resp = exchangeWithLog(url, HttpMethod.POST, headers, body, String.class);
+        JSONObject responseBody = new JSONObject(resp.getBody());
         return responseBody.getString("access_token");
     }
 
+    // ---------- Centralized logging wrapper ----------
+
+    private <T> ResponseEntity<T> exchangeWithLog(
+            String url,
+            HttpMethod method,
+            HttpHeaders headers,
+            String requestBody,
+            Class<T> responseType
+    ) {
+        String maskedReq = logService.maskSecrets(requestBody);
+        LeanApiLog.LeanApiLogBuilder logBuilder = LeanApiLog.builder()
+                .endpoint(url)
+                .requestBody(maskedReq);
+
+        try {
+            HttpEntity<String> entity = new HttpEntity<>(requestBody, headers);
+            ResponseEntity<T> response = restTemplate.exchange(url, method, entity, responseType);
+
+            String respString = null;
+            if (response.getBody() instanceof String) {
+                respString = (String) response.getBody();
+            } else {
+                respString = logService.toJson(response.getBody());
+            }
+            respString = logService.maskSecrets(respString);
+
+            logBuilder
+                    .statusCode(response.getStatusCodeValue())
+                    .responseBody(respString)
+                    .errorMessage(null);
+
+            logService.save(logBuilder.build());
+            return response;
+
+        } catch (HttpStatusCodeException e) {
+            String respBody = logService.maskSecrets(e.getResponseBodyAsString());
+            logBuilder
+                    .statusCode(e.getRawStatusCode())
+                    .responseBody(respBody)
+                    .errorMessage(e.getMessage());
+            logService.save(logBuilder.build());
+            throw e; // keep behavior same as before
+
+        } catch (RestClientException e) {
+            logBuilder
+                    .statusCode(0) // network/serialization/etc.
+                    .responseBody(null)
+                    .errorMessage(e.getMessage());
+            logService.save(logBuilder.build());
+            throw e;
+        } catch (Exception e) {
+            logBuilder
+                    .statusCode(0)
+                    .responseBody(null)
+                    .errorMessage("Unexpected: " + e.getClass().getSimpleName() + " - " + e.getMessage());
+            logService.save(logBuilder.build());
+            throw e;
+        }
+    }
 }
