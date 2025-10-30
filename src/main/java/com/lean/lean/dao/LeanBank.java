@@ -35,6 +35,18 @@ public class LeanBank {
     @Column(name = "background_color")
     private String backgroundColor;
 
+    @Column(name = "active_payments")
+    private Boolean isActivePayments;
+
+    @Column(name = "active_data")
+    private Boolean isActiveData;
+
+    @Column(name = "enabled_payments")
+    private Boolean isEnabledPayments;
+
+    @Column(name = "enabled_data")
+    private Boolean isEnabledData;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 

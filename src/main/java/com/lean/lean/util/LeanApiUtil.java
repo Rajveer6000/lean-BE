@@ -14,6 +14,9 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.http.*;
 import org.json.JSONObject;
+
+import java.time.LocalDate;
+
 @Slf4j
 @Component
 public class LeanApiUtil {
@@ -131,6 +134,50 @@ public class LeanApiUtil {
         JSONObject responseBody = new JSONObject(resp.getBody());
         return responseBody.toMap();
     }
+
+    public Object getUserTransactions(String entityId, String accountId, LocalDate fromDate, LocalDate toDate, String accessToken) {
+        String url = apiUrl + "/v1/transactions";
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Authorization", "Bearer " + accessToken);
+        headers.set("Accept", "*/*");
+        headers.set("Content-Type", "application/json");
+        String body = new JSONObject()
+                .put("entity_id", entityId)
+                .put("account_id", accountId)
+                .put("from_date", fromDate.toString())
+                .put("to_date", toDate.toString())
+                .put("insights", true)
+                .toString();
+        ResponseEntity<String> resp =
+                exchangeWithLog(url, HttpMethod.POST, headers, body, String.class);
+        JSONObject responseBody = new JSONObject(resp.getBody());
+        return responseBody.toMap();
+    }
+//public Object getUserTransactions(String entityId, String accountId, LocalDate fromDate, LocalDate toDate, String accessToken) {
+//    String url = apiUrl + "/data/v1/transactions";
+//    HttpHeaders headers = new HttpHeaders();
+//    headers.set("Authorization", "Bearer " + accessToken);
+//    headers.set("Accept", "*/*");
+//    headers.set("Content-Type", "application/json");
+//
+//    JSONObject body = new JSONObject()
+//            .put("entity_id", entityId)
+//            .put("account_id", accountId)
+//            .put("insights", true);
+//
+//    if (fromDate != null) {
+//        body.put("from_date", fromDate.toString());
+//    }
+//    if (toDate != null) {
+//        body.put("to_date", toDate.toString());
+//    }
+//
+//    ResponseEntity<String> resp =
+//            exchangeWithLog(url, HttpMethod.POST, headers, body.toString(), String.class);
+//    JSONObject responseBody = new JSONObject(resp.getBody());
+//    return responseBody.toMap();
+//}
+
     // ---------- Centralized logging wrapper ----------
 
     private <T> ResponseEntity<T> exchangeWithLog(
@@ -193,4 +240,6 @@ public class LeanApiUtil {
             throw e;
         }
     }
+
+
 }
