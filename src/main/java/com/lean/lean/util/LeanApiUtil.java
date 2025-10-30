@@ -3,7 +3,9 @@ package com.lean.lean.util;
 
 import com.lean.lean.dao.LeanApiLog;
 import com.lean.lean.dao.User;
+import com.lean.lean.dto.AddDestinationsBeneficiaryDto;
 import com.lean.lean.dto.LeanCustomerRegResponse;
+import com.lean.lean.dto.webHook.DestinationsBeneficiaryDto;
 import com.lean.lean.service.LeanApiLogService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -177,7 +179,28 @@ public class LeanApiUtil {
 //    JSONObject responseBody = new JSONObject(resp.getBody());
 //    return responseBody.toMap();
 //}
+    public DestinationsBeneficiaryDto createDestinationsBeneficiary(AddDestinationsBeneficiaryDto beneficiary, String accessToken) {
+        String url = apiUrl + "/payments/v1/destinations";
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Authorization", "Bearer " + accessToken);
+        headers.set("Content-Type", "application/json");
+        String body = new JSONObject()
+                .put("display_name", beneficiary.getDisplayName())
+                .put("name", beneficiary.getName())
+                .put("bank_identifier", beneficiary.getBankIdentifier())
+                .put("address", beneficiary.getAddress())
+                .put("city", beneficiary.getCity())
+                .put("country", beneficiary.getCountry())
+                .put("account_number", beneficiary.getAccountNumber())
+                .put("swift_code", beneficiary.getSwiftCode())
+                .put("iban", beneficiary.getIban())
+                .toString();
 
+        ResponseEntity<DestinationsBeneficiaryDto> resp =
+                exchangeWithLog(url, HttpMethod.POST, headers, body, DestinationsBeneficiaryDto.class);
+
+        return resp.getBody();
+    }
     // ---------- Centralized logging wrapper ----------
 
     private <T> ResponseEntity<T> exchangeWithLog(
@@ -240,6 +263,7 @@ public class LeanApiUtil {
             throw e;
         }
     }
+
 
 
 }
