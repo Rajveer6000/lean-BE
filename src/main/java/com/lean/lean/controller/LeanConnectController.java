@@ -5,6 +5,8 @@ import com.lean.lean.service.UserLeanService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
+
 @RestController
 @RequestMapping("/api/lean")
 public class LeanConnectController {
@@ -31,4 +33,15 @@ public class LeanConnectController {
     public Object getAccountBalances(@RequestParam Long userId, @RequestParam String accountId) {
         return userLeanService.getAccountBalances(userId, accountId);
     }
+
+    @GetMapping("/account-transactions")
+    public Object getUserTransactions(
+            @RequestParam Long userId,
+            @RequestParam String accountId,
+            @RequestParam(required = false) LocalDate fromDate,
+            @RequestParam(required = false) LocalDate toDate) {
+
+        return userLeanService.getUserTransactions(userId, accountId, fromDate, toDate);
+    }
+
 }

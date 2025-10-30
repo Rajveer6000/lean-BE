@@ -12,6 +12,9 @@ import com.lean.lean.util.LeanApiUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+
+import java.time.LocalDate;
+
 @Slf4j
 @Service
 public class UserLeanService {
@@ -88,5 +91,21 @@ public class UserLeanService {
         String accessToken = leanApiUtil.getAccessToken();
         log.info("accessToken: {}", accessToken);
         return leanApiUtil.getAccountBalances(leanEntity.getEntityId(), accountId, accessToken);
+    }
+
+
+    public Object getUserTransactions(Long userId, String accountId, LocalDate fromDate, LocalDate toDate) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        LeanUser leanUser = leanUserRepository.findFirstByUserId(userId);
+        LeanEntity leanEntity = leanEntityRepository.findByUserId(userId.toString())
+                .orElseThrow(() -> new RuntimeException("LeanEntity not found"));
+        if (leanUser == null) {
+            throw new RuntimeException("LeanUser not found for user ID: " + user.getId());
+        }
+        String accessToken = leanApiUtil.getAccessToken();
+        log.info("accessToken: {}", accessToken);
+        return leanApiUtil.getUserTransactions(leanEntity.getEntityId(), accountId, fromDate, toDate, accessToken);
     }
 }

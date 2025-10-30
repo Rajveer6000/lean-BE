@@ -5,6 +5,7 @@ import com.lean.lean.dao.LeanBank;
 import com.lean.lean.dao.LeanEntity;
 import com.lean.lean.dao.LeanWebhookLog;
 import com.lean.lean.dto.WebHookRequestDto;
+import com.lean.lean.dto.webHook.BankAvailabilityDto;
 import com.lean.lean.dto.webHook.BankDetails;
 import com.lean.lean.dto.webHook.EntityCreatedDTO;
 import com.lean.lean.enums.WebHookType;
@@ -17,6 +18,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Optional;
+
 @Slf4j
 @Service
 public class WebhookServiceImpl implements WebhookService {
@@ -51,15 +54,42 @@ public class WebhookServiceImpl implements WebhookService {
                 case ENTITY_CREATED -> {
                     handleEntityCreated(webhookPayloadDto.getPayload());
                 }
-//                case PAYMENT_CREATED -> {
-//                    handlePaymentCreated(webhookPayloadDto.getPayload());
-//                }
+                case BANK_AVAILABILITY_UPDATED -> {
+                    handleBankAvailabilityUpdated(webhookPayloadDto.getPayload());
+                }
             }
             log.info("Processing Complete: {}", logRow.getId());
         } catch (Exception e) {
             log.error("Error processing webhook {}: {}", logRow.getId(), e.getMessage());
         }
         return leanWebhookLogRepository.findById(logRow.getId()).orElse(logRow);
+    }
+
+    @Transactional
+    public void handleBankAvailabilityUpdated(Object payload) {
+        log.info("Handling bank.availability.updated with payload: {}", payload);
+        BankAvailabilityDto dto;
+        try {
+            if (payload instanceof String s) {
+                dto = objectMapper.readValue(s, BankAvailabilityDto.class);
+            } else {
+                dto = objectMapper.readValue(objectMapper.writeValueAsString(payload), BankAvailabilityDto.class);
+            }
+            Optional<LeanBank> bank = leanBankRepository.findByIdentifier(dto.getIdentifier());
+            if (bank.isEmpty()) {
+                log.warn("Bank with identifier {} not found; skipping update.", dto.getIdentifier());
+                return;
+            }
+            bank.get().setIsActiveData(dto.getAvailability().getActive().getData());
+            bank.get().setIsActivePayments(dto.getAvailability().getActive().getPayments());
+            bank.get().setIsEnabledData(dto.getAvailability().getEnabled().getData());
+            bank.get().setIsEnabledPayments(dto.getAvailability().getEnabled().getPayments());
+            bank.get().setUpdatedAt(LocalDateTime.now());
+            leanBankRepository.save(bank.get());
+            log.info("bank.availability.updated processed for bank.identifier={}", dto.getIdentifier());
+        } catch (Exception e) {
+            log.error("Failed to parse bank.availability.updated payload", e);
+        }
     }
 
     @Transactional
