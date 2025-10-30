@@ -1,6 +1,7 @@
 package com.lean.lean.controller;
 
 import com.lean.lean.dto.UserLeanConnectResponse;
+import com.lean.lean.dto.webHook.DestinationsBeneficiaryDto;
 import com.lean.lean.service.UserLeanService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -15,22 +16,27 @@ public class LeanConnectController {
     private UserLeanService userLeanService;
 
     @GetMapping("/connect")
-    public UserLeanConnectResponse connectUser(@RequestParam Long userId) {
+    public UserLeanConnectResponse connectUser(
+            @RequestParam Long userId) {
         return userLeanService.connectUser(userId);
     }
 
     @GetMapping("/UserDetails")
-    public Object getLeanUserDetails(@RequestParam Long userId) {
+    public Object getLeanUserDetails(
+            @RequestParam Long userId) {
         return userLeanService.getLeanUserDetails(userId);
     }
 
     @GetMapping("/userAccounts")
-    public Object getUserAccounts(@RequestParam Long userId) {
+    public Object getUserAccounts(
+            @RequestParam Long userId) {
         return userLeanService.getUserAccounts(userId);
     }
 
     @GetMapping("/accountBalances")
-    public Object getAccountBalances(@RequestParam Long userId, @RequestParam String accountId) {
+    public Object getAccountBalances(
+            @RequestParam Long userId,
+            @RequestParam String accountId) {
         return userLeanService.getAccountBalances(userId, accountId);
     }
 
