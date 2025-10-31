@@ -57,11 +57,20 @@ public class WebhookServiceImpl implements WebhookService {
                 case BANK_AVAILABILITY_UPDATED -> {
                     handleBankAvailabilityUpdated(webhookPayloadDto.getPayload());
                 }
+                case PAYMENT_SOURCE_CREATED -> {
+                    handlePaymentSourceCreated(webhookPayloadDto.getPayload());
+                }
                 case PAYMENT_SOURCE_BENEFICIARY_CREATED ->{
                      handlePaymentSourceBeneficiaryCreated(webhookPayloadDto.getPayload());
                 }
-                case PAYMENT_SOURCE_CREATED -> {
-                    handlePaymentSourceCreated(webhookPayloadDto.getPayload());
+                case PAYMENT_SOURCE_BENEFICIARY_UPDATED -> {
+                    handlePaymentSourceBeneficiaryUpdated(webhookPayloadDto.getPayload());
+                }
+                case PAYMENT_CREATED -> {
+                    handlePaymentCreated(webhookPayloadDto.getPayload());
+                }
+                case PAYMENT_UPDATED -> {
+                    handlePaymentUpdated(webhookPayloadDto.getPayload());
                 }
             }
             log.info("Processing Complete: {}", logRow.getId());
@@ -90,6 +99,27 @@ public class WebhookServiceImpl implements WebhookService {
     public void handlePaymentSourceBeneficiaryCreated(Object payload) {
         log.info("Handling payment_source.beneficiary.created with payload: {}", payload);
         // Implementation for handling payment_source.beneficiary.created webhook
+        // Currently a placeholder as no specific instructions were provided
+    }
+
+    @Transactional
+    public void handlePaymentSourceBeneficiaryUpdated(Object payload) {
+        log.info("Handling payment_source.beneficiary.updated with payload: {}", payload);
+        // Implementation for handling payment_source.beneficiary.updated webhook
+        // Currently a placeholder as no specific instructions were provided
+    }
+
+    @Transactional
+    public void handlePaymentCreated(Object payload) {
+        log.info("Handling payment.created with payload: {}", payload);
+        // Implementation for handling payment.created webhook
+        // Currently a placeholder as no specific instructions were provided
+    }
+
+    @Transactional
+    public void handlePaymentUpdated(Object payload) {
+        log.info("Handling payment.updated with payload: {}", payload);
+        // Implementation for handling payment.updated webhook
         // Currently a placeholder as no specific instructions were provided
     }
 
