@@ -1,7 +1,7 @@
 package com.lean.lean.controller;
 
 
-import com.lean.lean.dao.DestinationsBeneficiary;
+import com.lean.lean.dao.LeanDestinations;
 import com.lean.lean.dto.AddDestinationsBeneficiaryDto;
 import com.lean.lean.service.DestinationsBeneficiaryService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,20 +20,20 @@ public class DestinationsBeneficiaryController {
     private DestinationsBeneficiaryService beneficiaryService;
 
     @PostMapping
-    public ResponseEntity<DestinationsBeneficiary> createBeneficiary(@RequestBody AddDestinationsBeneficiaryDto beneficiary) {
-        DestinationsBeneficiary savedBeneficiary = beneficiaryService.createDestinationsBeneficiary(beneficiary);
+    public ResponseEntity<LeanDestinations> createBeneficiary(@RequestBody AddDestinationsBeneficiaryDto beneficiary) {
+        LeanDestinations savedBeneficiary = beneficiaryService.createDestinationsBeneficiary(beneficiary);
         return new ResponseEntity<>(savedBeneficiary, HttpStatus.CREATED);
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<DestinationsBeneficiary> getBeneficiaryById(@PathVariable Long id) {
-        Optional<DestinationsBeneficiary> beneficiaryOptional = beneficiaryService.getDestinationsBeneficiary(id);
+    public ResponseEntity<LeanDestinations> getBeneficiaryById(@PathVariable Long id) {
+        Optional<LeanDestinations> beneficiaryOptional = beneficiaryService.getDestinationsBeneficiary(id);
         return beneficiaryOptional.map(destinationsBeneficiary -> new ResponseEntity<>(destinationsBeneficiary, HttpStatus.OK)).orElseGet(() -> new ResponseEntity<>(HttpStatus.NOT_FOUND));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<DestinationsBeneficiary> updateBeneficiary(@PathVariable Long id, @RequestBody DestinationsBeneficiary updatedBeneficiary) {
-        DestinationsBeneficiary existingBeneficiaryOptional = beneficiaryService.updateDestinationsBeneficiary(id,updatedBeneficiary);
+    public ResponseEntity<LeanDestinations> updateBeneficiary(@PathVariable Long id, @RequestBody LeanDestinations updatedBeneficiary) {
+        LeanDestinations existingBeneficiaryOptional = beneficiaryService.updateDestinationsBeneficiary(id,updatedBeneficiary);
         return new ResponseEntity<>(existingBeneficiaryOptional, HttpStatus.OK);
     }
 

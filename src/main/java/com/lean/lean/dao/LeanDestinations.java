@@ -11,8 +11,8 @@ import java.time.LocalDateTime;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-@Table(name = "destinations_beneficiary")
-public class DestinationsBeneficiary {
+@Table(name = "lean_destinations")
+public class LeanDestinations {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
