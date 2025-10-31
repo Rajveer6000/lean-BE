@@ -1,10 +1,7 @@
 package com.lean.lean.service.webhook;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.lean.lean.dao.LeanBank;
-import com.lean.lean.dao.LeanEntity;
-import com.lean.lean.dao.LeanPaymentSource;
-import com.lean.lean.dao.LeanWebhookLog;
+import com.lean.lean.dao.*;
 import com.lean.lean.dto.WebHookRequestDto;
 import com.lean.lean.dto.webHook.*;
 import com.lean.lean.enums.WebHookType;
@@ -110,13 +107,22 @@ public class WebhookServiceImpl implements WebhookService {
             } else {
                 dto = objectMapper.readValue(objectMapper.writeValueAsString(payload), PaymentIntentCreatedDto.class);
             }
+            LeanPaymentIntent paymentIntent = leanPaymentIntentRepository.findByPaymentIntentId(dto.getIntent_id()).orElseGet(LeanPaymentIntent::new);
+            boolean isNew = (paymentIntent.getId() == null);
+            paymentIntent.setPaymentIntentId(dto.getIntent_id());
+            paymentIntent.setAmount(dto.getAmount());
+            paymentIntent.setCurrency(dto.getCurrency());
+            paymentIntent.setStatus(dto.getStatus());
+            paymentIntent.setUpdatedAt(LocalDateTime.now());
+            if (isNew) paymentIntent.setCreatedAt(LocalDateTime.now());
+            if (isNew) paymentIntent.setInitiatedAt(LocalDateTime.now());
+            leanPaymentIntentRepository.save(paymentIntent);
+            log.info("payment_intent.created processed for payment_intent.id={}", dto.getIntent_id());
         } catch (Exception e) {
             log.error("Failed to parse payment_intent.created payload", e);
             return;
         }
     }
-
-
 
     @Transactional
     public void handlePaymentSourceCreated(Object payload) {
@@ -128,6 +134,18 @@ public class WebhookServiceImpl implements WebhookService {
             } else {
                 dto = objectMapper.readValue(objectMapper.writeValueAsString(payload), PaymentSourceCreated.class);
             }
+            LeanPaymentSource paymentSource = leanPaymentSourceRepository.findByPaymentSourceId(dto.getId()).orElseGet(LeanPaymentSource::new);
+            boolean isNew = (paymentSource.getId() == null);
+            paymentSource.setPaymentSourceId(dto.getId());
+            paymentSource.setLeanUserId(dto.getCustomer_id());
+            paymentSource.setBankName(dto.getBank_name());
+            paymentSource.setBankIdentifier(dto.getBank_identifier());
+            paymentSource.setStatus(dto.getStatus());
+            paymentSource.setUpdatedAt(LocalDateTime.now());
+            paymentSource.setLastRefreshedAt(LocalDateTime.now());
+            if (isNew) paymentSource.setCreatedAt(LocalDateTime.now());
+            leanPaymentSourceRepository.save(paymentSource);
+            log.info("payment_source.created processed for payment_source.id={}", dto.getId());
         } catch (Exception e) {
             log.error("Failed to parse payment_source.created payload", e);
             return;
@@ -144,6 +162,19 @@ public class WebhookServiceImpl implements WebhookService {
             } else {
                 dto = objectMapper.readValue(objectMapper.writeValueAsString(payload), PaymentSourceBeneficiaryDto.class);
             }
+            LeanBeneficiary beneficiary = leanBeneficiaryRepository.findByBeneficiaryId(dto.getId()).orElseGet(LeanBeneficiary::new);
+            boolean isNew = (beneficiary.getId() == null);
+            beneficiary.setBeneficiaryId(dto.getId());
+            beneficiary.setLeanUserId(dto.getCustomer_id());
+            beneficiary.setStatus(dto.getStatus());
+            beneficiary.setPaymentSourceId(dto.getPayment_source_id());
+            beneficiary.setPaymentDestinationId(dto.getPayment_destination_id());
+            beneficiary.setPaymentSourceBankIdentifier(dto.getPayment_source_bank_identifier());
+            beneficiary.setUpdatedAt(LocalDateTime.now());
+            if (isNew) beneficiary.setCreatedAt(LocalDateTime.now());
+            leanBeneficiaryRepository.save(beneficiary);
+            log.info("payment_source.beneficiary.created processed for beneficiary.id={}", dto.getId());
+
         } catch (Exception e) {
             log.error("Failed to parse payment_source.beneficiary.created payload", e);
             return;
@@ -160,6 +191,18 @@ public class WebhookServiceImpl implements WebhookService {
             } else {
                 dto = objectMapper.readValue(objectMapper.writeValueAsString(payload), PaymentSourceBeneficiaryDto.class);
             }
+            LeanBeneficiary beneficiary = leanBeneficiaryRepository.findByBeneficiaryId(dto.getId()).orElseGet(LeanBeneficiary::new);
+            boolean isNew = (beneficiary.getId() == null);
+            beneficiary.setBeneficiaryId(dto.getId());
+            beneficiary.setLeanUserId(dto.getCustomer_id());
+            beneficiary.setStatus(dto.getStatus());
+            beneficiary.setPaymentSourceId(dto.getPayment_source_id());
+            beneficiary.setPaymentDestinationId(dto.getPayment_destination_id());
+            beneficiary.setPaymentSourceBankIdentifier(dto.getPayment_source_bank_identifier());
+            beneficiary.setUpdatedAt(LocalDateTime.now());
+            if (isNew) beneficiary.setCreatedAt(LocalDateTime.now());
+            leanBeneficiaryRepository.save(beneficiary);
+            log.info("payment_source.beneficiary.updated processed for beneficiary.id={}", dto.getId());
         } catch (Exception e) {
             log.error("Failed to parse payment_source.beneficiary.created payload", e);
             return;

@@ -23,35 +23,14 @@ public class LeanPaymentSource {
     @Column(name = "lean_user_id", nullable = false)
     private String leanUserId;
 
-    @Column(name = "entity_id", nullable = false)
-    private String entityId;
-
-    @Column(name = "account_id", nullable = false)
-    private String accountId;
+    @Column(name = "bank_identifier", nullable = false)
+    private String bankIdentifier;
 
     @Column(name = "bank_name", nullable = false)
     private String bankName;
 
-    @Column(name = "account_type", nullable = false)
-    private String accountType;
-
-    @Column(name = "account_number_masked")
-    private String accountNumberMasked;
-
-    @Column(name = "iban", unique = true)
-    private String iban;
-
-    @Column(name = "currency", length = 3)
-    private String currency = "AED";
-
-    @Column(name = "balance")
-    private Double balance;
-
     @Column(name = "status")
-    private String status = "ACTIVE";
-
-    @Column(name = "is_primary")
-    private Boolean isPrimary = false;
+    private String status;
 
     @Column(name = "last_refreshed_at")
     private LocalDateTime lastRefreshedAt;

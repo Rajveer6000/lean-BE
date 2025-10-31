@@ -4,6 +4,8 @@ package com.lean.lean.dao;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
@@ -20,17 +22,17 @@ public class LeanPaymentIntent {
     @Column(name = "payment_intent_id", nullable = false, unique = true)
     private String paymentIntentId;
 
-    @Column(name = "lean_user_id", nullable = false)
+    @Column(name = "lean_user_id")
     private String leanUserId;
 
-    @Column(name = "payment_destination_id", nullable = false)
+    @Column(name = "payment_destination_id")
     private String paymentDestinationId;
 
     @Column(name = "beneficiary_id")
     private String beneficiaryId;
 
     @Column(name = "amount", nullable = false)
-    private Double amount;
+    private BigDecimal amount;
 
     @Column(name = "currency", length = 3)
     private String currency;

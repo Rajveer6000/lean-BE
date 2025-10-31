@@ -10,7 +10,6 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @Table(name = "lean_beneficiaries")
 public class LeanBeneficiary {
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id")
@@ -27,6 +26,9 @@ public class LeanBeneficiary {
 
     @Column(name = "payment_destination_id", nullable = false)
     private String paymentDestinationId;
+
+    @Column(name="payment_source_bank_identifier")
+    private String paymentSourceBankIdentifier;
 
     @Column(name = "status")
     private String status;
