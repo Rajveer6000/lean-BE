@@ -1,7 +1,7 @@
 package com.lean.lean.service;
 
 
-import com.lean.lean.dao.DestinationsBeneficiary;
+import com.lean.lean.dao.LeanDestinations;
 import com.lean.lean.dto.AddDestinationsBeneficiaryDto;
 import com.lean.lean.dto.webHook.DestinationsBeneficiaryDto;
 import com.lean.lean.repository.DestinationsBeneficiaryRepository;
@@ -24,8 +24,8 @@ public class DestinationsBeneficiaryService {
     @Autowired
     private LeanApiUtil leanApiUtil;
 
-    public DestinationsBeneficiary createDestinationsBeneficiary(AddDestinationsBeneficiaryDto beneficiary) {
-        DestinationsBeneficiary existingBeneficiary = beneficiaryRepository.findByIdentifierAndAccountNumber(
+    public LeanDestinations createDestinationsBeneficiary(AddDestinationsBeneficiaryDto beneficiary) {
+        LeanDestinations existingBeneficiary = beneficiaryRepository.findByIdentifierAndAccountNumber(
                 beneficiary.getBankIdentifier(),
                 beneficiary.getAccountNumber()
         );
@@ -39,7 +39,7 @@ public class DestinationsBeneficiaryService {
         String accessToken = leanApiUtil.getAccessToken();
         log.info("Access Token obtained: {}", accessToken);
         DestinationsBeneficiaryDto destinationsBeneficiarydto = leanApiUtil.createDestinationsBeneficiary(beneficiary,accessToken);
-        DestinationsBeneficiary destinationsBeneficiary = new DestinationsBeneficiary();
+        LeanDestinations destinationsBeneficiary = new LeanDestinations();
         destinationsBeneficiary.setUuid(destinationsBeneficiarydto.getId());
         destinationsBeneficiary.setDisplayName(destinationsBeneficiarydto.getDisplay_name());
         destinationsBeneficiary.setName(destinationsBeneficiarydto.getName());
@@ -57,11 +57,11 @@ public class DestinationsBeneficiaryService {
         return beneficiaryRepository.save(destinationsBeneficiary);
     }
 
-    public Optional<DestinationsBeneficiary> getDestinationsBeneficiary(Long id) {
+    public Optional<LeanDestinations> getDestinationsBeneficiary(Long id) {
         return beneficiaryRepository.findById(id);
     }
 
-    public DestinationsBeneficiary updateDestinationsBeneficiary(Long id, DestinationsBeneficiary beneficiary) {
+    public LeanDestinations updateDestinationsBeneficiary(Long id, LeanDestinations beneficiary) {
         if (!beneficiaryRepository.existsById(id)) {
             throw  new RuntimeException("Beneficiary with ID " + id + " not found.");
         }
