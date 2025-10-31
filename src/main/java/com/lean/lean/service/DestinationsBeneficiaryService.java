@@ -69,7 +69,9 @@ public class DestinationsBeneficiaryService {
         return beneficiaryRepository.save(beneficiary);
     }
 
-    public List<DestinationsBeneficiary> getAllBeneficiaries() {
-        return beneficiaryRepository.findAll();
+    public Object getAllBeneficiaries() {
+        String accessToken = leanApiUtil.getAccessToken();
+        log.info("accessToken: {}", accessToken);
+        return leanApiUtil.getAllDestinationsBeneficiaries(accessToken);
     }
 }

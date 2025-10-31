@@ -38,8 +38,8 @@ public class DestinationsBeneficiaryController {
     }
 
     @GetMapping("/getAll")
-    public ResponseEntity<List<DestinationsBeneficiary>> getAllBeneficiaries() {
-        List<DestinationsBeneficiary> beneficiaries = beneficiaryService.getAllBeneficiaries();
+    public ResponseEntity<Object> getAllBeneficiaries() {
+        Object beneficiaries = beneficiaryService.getAllBeneficiaries();
         return new ResponseEntity<>(beneficiaries, HttpStatus.OK);
     }
 }
