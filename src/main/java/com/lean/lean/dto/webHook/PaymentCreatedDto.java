@@ -23,8 +23,4 @@ public class PaymentCreatedDto {
     private String status;
     private BigDecimal amount;
     private String currency;
-    private String granular_status_code;
-    private String bank_transaction_reference;
-    private String debtor_account_id;
-
 }
