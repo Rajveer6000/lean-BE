@@ -68,6 +68,14 @@ public class WebhookServiceImpl implements WebhookService {
         } catch (Exception e) {
             log.error("Error processing webhook {}: {}", logRow.getId(), e.getMessage());
         }
+        try {
+            String json = new ObjectMapper()
+                    .writerWithDefaultPrettyPrinter()
+                    .writeValueAsString(webhookPayloadDto);
+            System.out.println("Received webhook payload:\n" + json);
+        } catch (Exception e) {
+            System.out.println("Failed to serialize webhook payload: " + e.getMessage());
+        }
         return leanWebhookLogRepository.findById(logRow.getId()).orElse(logRow);
     }
 
