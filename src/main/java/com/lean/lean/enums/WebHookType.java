@@ -10,7 +10,8 @@ public enum WebHookType {
     ENTITY_RECONNECTED("entity.reconnected"),
     RESULTS_READY("results.ready"),
     BANK_AVAILABILITY_UPDATED("bank.availability.updated"),
-    PAYMENT_RECONCILIATION_UPDATED("payment.reconciliation.updated");
+    PAYMENT_RECONCILIATION_UPDATED("payment.reconciliation.updated"),
+    PAYMENT_INTENT_CREATED("payment_intent.created");
 
     private final String value;
 

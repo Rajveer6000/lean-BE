@@ -3,15 +3,12 @@ package com.lean.lean.service.webhook;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lean.lean.dao.LeanBank;
 import com.lean.lean.dao.LeanEntity;
+import com.lean.lean.dao.LeanPaymentSource;
 import com.lean.lean.dao.LeanWebhookLog;
 import com.lean.lean.dto.WebHookRequestDto;
-import com.lean.lean.dto.webHook.BankAvailabilityDto;
-import com.lean.lean.dto.webHook.BankDetails;
-import com.lean.lean.dto.webHook.EntityCreatedDTO;
+import com.lean.lean.dto.webHook.*;
 import com.lean.lean.enums.WebHookType;
-import com.lean.lean.repository.LeanBankRepository;
-import com.lean.lean.repository.LeanEntityRepository;
-import com.lean.lean.repository.LeanWebhookLogRepository;
+import com.lean.lean.repository.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -29,6 +26,18 @@ public class WebhookServiceImpl implements WebhookService {
 
     @Autowired
     private LeanBankRepository leanBankRepository;
+
+    @Autowired
+    private LeanPaymentSourceRepository leanPaymentSourceRepository;
+
+    @Autowired
+    private LeanPaymentIntentRepository leanPaymentIntentRepository;
+
+    @Autowired
+    private LeanBeneficiaryRepository leanBeneficiaryRepository;
+
+    @Autowired
+    private LeanPaymentRepository leanPaymentRepository;
 
     @Autowired
     private LeanEntityRepository leanEntityRepository;
@@ -72,6 +81,9 @@ public class WebhookServiceImpl implements WebhookService {
                 case PAYMENT_UPDATED -> {
                     handlePaymentUpdated(webhookPayloadDto.getPayload());
                 }
+                case PAYMENT_INTENT_CREATED -> {
+                    handlePaymentIntentCreated(webhookPayloadDto.getPayload());
+                }
             }
             log.info("Processing Complete: {}", logRow.getId());
         } catch (Exception e) {
@@ -89,38 +101,101 @@ public class WebhookServiceImpl implements WebhookService {
     }
 
     @Transactional
+    public void handlePaymentIntentCreated(Object payload) {
+        log.info("Handling payment_intent.created with payload: {}", payload);
+        PaymentIntentCreatedDto dto;
+        try {
+            if (payload instanceof String s) {
+                dto = objectMapper.readValue(s, PaymentIntentCreatedDto.class);
+            } else {
+                dto = objectMapper.readValue(objectMapper.writeValueAsString(payload), PaymentIntentCreatedDto.class);
+            }
+        } catch (Exception e) {
+            log.error("Failed to parse payment_intent.created payload", e);
+            return;
+        }
+    }
+
+
+
+    @Transactional
     public void handlePaymentSourceCreated(Object payload) {
         log.info("Handling payment_source.created with payload: {}", payload);
-        // Implementation for handling payment_source.created webhook
-        // Currently a placeholder as no specific instructions were provided
+        PaymentSourceCreated dto;
+        try {
+            if (payload instanceof String s) {
+                dto = objectMapper.readValue(s, PaymentSourceCreated.class);
+            } else {
+                dto = objectMapper.readValue(objectMapper.writeValueAsString(payload), PaymentSourceCreated.class);
+            }
+        } catch (Exception e) {
+            log.error("Failed to parse payment_source.created payload", e);
+            return;
+        }
     }
 
     @Transactional
     public void handlePaymentSourceBeneficiaryCreated(Object payload) {
         log.info("Handling payment_source.beneficiary.created with payload: {}", payload);
-        // Implementation for handling payment_source.beneficiary.created webhook
-        // Currently a placeholder as no specific instructions were provided
+        PaymentSourceBeneficiaryDto dto;
+        try {
+            if (payload instanceof String s) {
+                dto = objectMapper.readValue(s, PaymentSourceBeneficiaryDto.class);
+            } else {
+                dto = objectMapper.readValue(objectMapper.writeValueAsString(payload), PaymentSourceBeneficiaryDto.class);
+            }
+        } catch (Exception e) {
+            log.error("Failed to parse payment_source.beneficiary.created payload", e);
+            return;
+        }
     }
 
     @Transactional
     public void handlePaymentSourceBeneficiaryUpdated(Object payload) {
         log.info("Handling payment_source.beneficiary.updated with payload: {}", payload);
-        // Implementation for handling payment_source.beneficiary.updated webhook
-        // Currently a placeholder as no specific instructions were provided
+        PaymentSourceBeneficiaryDto dto;
+        try {
+            if (payload instanceof String s) {
+                dto = objectMapper.readValue(s, PaymentSourceBeneficiaryDto.class);
+            } else {
+                dto = objectMapper.readValue(objectMapper.writeValueAsString(payload), PaymentSourceBeneficiaryDto.class);
+            }
+        } catch (Exception e) {
+            log.error("Failed to parse payment_source.beneficiary.created payload", e);
+            return;
+        }
     }
 
     @Transactional
     public void handlePaymentCreated(Object payload) {
         log.info("Handling payment.created with payload: {}", payload);
-        // Implementation for handling payment.created webhook
-        // Currently a placeholder as no specific instructions were provided
+        PaymentCreatedDto dto;
+        try {
+            if (payload instanceof String s) {
+                dto = objectMapper.readValue(s, PaymentCreatedDto.class);
+            } else {
+                dto = objectMapper.readValue(objectMapper.writeValueAsString(payload), PaymentCreatedDto.class);
+            }
+        } catch (Exception e) {
+            log.error("Failed to parse payment.created payload", e);
+            return;
+        }
     }
 
     @Transactional
     public void handlePaymentUpdated(Object payload) {
         log.info("Handling payment.updated with payload: {}", payload);
-        // Implementation for handling payment.updated webhook
-        // Currently a placeholder as no specific instructions were provided
+        PaymentCreatedDto dto;
+        try {
+            if (payload instanceof String s) {
+                dto = objectMapper.readValue(s, PaymentCreatedDto.class);
+            } else {
+                dto = objectMapper.readValue(objectMapper.writeValueAsString(payload), PaymentCreatedDto.class);
+            }
+        } catch (Exception e) {
+            log.error("Failed to parse payment.created payload", e);
+            return;
+        }
     }
 
     @Transactional

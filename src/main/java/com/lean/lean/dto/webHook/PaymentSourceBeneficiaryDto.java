@@ -14,7 +14,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @JsonIgnoreProperties(ignoreUnknown = true)
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
-public class PaymentSourceBeneficiaryCreatedDto {
+public class PaymentSourceBeneficiaryDto {
     private String id;
     private String status;
     private String customer_id;
