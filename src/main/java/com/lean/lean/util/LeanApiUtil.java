@@ -4,10 +4,12 @@ package com.lean.lean.util;
 import com.lean.lean.dao.LeanApiLog;
 import com.lean.lean.dao.User;
 import com.lean.lean.dto.AddDestinationsBeneficiaryDto;
+import com.lean.lean.dto.IntentDto;
 import com.lean.lean.dto.LeanCustomerRegResponse;
 import com.lean.lean.dto.webHook.DestinationsBeneficiaryDto;
 import com.lean.lean.service.LeanApiLogService;
 import lombok.extern.slf4j.Slf4j;
+import org.json.JSONArray;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -18,6 +20,9 @@ import org.springframework.http.*;
 import org.json.JSONObject;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @Component
@@ -137,48 +142,48 @@ public class LeanApiUtil {
         return responseBody.toMap();
     }
 
-    public Object getUserTransactions(String entityId, String accountId, LocalDate fromDate, LocalDate toDate, String accessToken) {
-        String url = apiUrl + "/v1/transactions";
+    public Object getAllDestinationsBeneficiaries(String accessToken) {
+        String url = apiUrl + "/payments/v1/destinations";
         HttpHeaders headers = new HttpHeaders();
         headers.set("Authorization", "Bearer " + accessToken);
         headers.set("Accept", "*/*");
         headers.set("Content-Type", "application/json");
-        String body = new JSONObject()
+        ResponseEntity<String> resp =
+                exchangeWithLog(url, HttpMethod.GET, headers, null, String.class);
+        JSONArray responseArray = new JSONArray(resp.getBody());
+
+        List<Map<String, Object>> destinations = new ArrayList<>();
+        for (int i = 0; i < responseArray.length(); i++) {
+            destinations.add(responseArray.getJSONObject(i).toMap());
+        }
+        return destinations;
+    }
+
+    public Object getUserTransactions(String entityId, String accountId, LocalDate fromDate, LocalDate toDate, String accessToken) {
+        String url = apiUrl + "/data/v1/transactions";
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Authorization", "Bearer " + accessToken);
+        headers.set("Accept", "*/*");
+        headers.set("Content-Type", "application/json");
+
+        JSONObject body = new JSONObject()
                 .put("entity_id", entityId)
                 .put("account_id", accountId)
-                .put("from_date", fromDate.toString())
-                .put("to_date", toDate.toString())
-                .put("insights", true)
-                .toString();
+                .put("insights", true);
+
+        if (fromDate != null) {
+            body.put("from_date", fromDate.toString());
+        }
+        if (toDate != null) {
+            body.put("to_date", toDate.toString());
+        }
+
         ResponseEntity<String> resp =
-                exchangeWithLog(url, HttpMethod.POST, headers, body, String.class);
+                exchangeWithLog(url, HttpMethod.POST, headers, body.toString(), String.class);
         JSONObject responseBody = new JSONObject(resp.getBody());
         return responseBody.toMap();
     }
-//public Object getUserTransactions(String entityId, String accountId, LocalDate fromDate, LocalDate toDate, String accessToken) {
-//    String url = apiUrl + "/data/v1/transactions";
-//    HttpHeaders headers = new HttpHeaders();
-//    headers.set("Authorization", "Bearer " + accessToken);
-//    headers.set("Accept", "*/*");
-//    headers.set("Content-Type", "application/json");
-//
-//    JSONObject body = new JSONObject()
-//            .put("entity_id", entityId)
-//            .put("account_id", accountId)
-//            .put("insights", true);
-//
-//    if (fromDate != null) {
-//        body.put("from_date", fromDate.toString());
-//    }
-//    if (toDate != null) {
-//        body.put("to_date", toDate.toString());
-//    }
-//
-//    ResponseEntity<String> resp =
-//            exchangeWithLog(url, HttpMethod.POST, headers, body.toString(), String.class);
-//    JSONObject responseBody = new JSONObject(resp.getBody());
-//    return responseBody.toMap();
-//}
+
     public DestinationsBeneficiaryDto createDestinationsBeneficiary(AddDestinationsBeneficiaryDto beneficiary, String accessToken) {
         String url = apiUrl + "/payments/v1/destinations";
         HttpHeaders headers = new HttpHeaders();
@@ -200,6 +205,37 @@ public class LeanApiUtil {
                 exchangeWithLog(url, HttpMethod.POST, headers, body, DestinationsBeneficiaryDto.class);
 
         return resp.getBody();
+    }
+
+    public Object createPaymentIntent(IntentDto intentDto , String accessToken, String customerId) {
+        String url = apiUrl + "/payments/v1/intents";
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Authorization", "Bearer " + accessToken);
+        headers.set("Content-Type", "application/json");
+        String body = new JSONObject()
+                .put("amount", intentDto.getAmount())
+                .put("currency", intentDto.getCurrency())
+                .put("payment_destination_id", intentDto.getPayment_destination_id())
+                .put("customer_id", customerId)
+                .put("description", intentDto.getDescription())
+                .toString();
+
+        ResponseEntity<String> resp =
+                exchangeWithLog(url, HttpMethod.POST, headers, body, String.class);
+        JSONObject responseBody = new JSONObject(resp.getBody());
+        return responseBody.toMap();
+    }
+
+    public Object getPaymentSource(String accessToken, String leanUserId, String paymentSourceId) {
+        String url = apiUrl + "/customers/v1/" + leanUserId + "/payment-sources/" + paymentSourceId;
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Authorization", "Bearer " + accessToken);
+        headers.set("Accept", "*/*");
+        headers.set("Content-Type", "application/json");
+        ResponseEntity<String> resp =
+                exchangeWithLog(url, HttpMethod.GET, headers, null, String.class);
+        JSONObject responseBody = new JSONObject(resp.getBody());
+        return responseBody.toMap();
     }
     // ---------- Centralized logging wrapper ----------
 

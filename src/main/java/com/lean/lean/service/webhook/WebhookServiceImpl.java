@@ -57,12 +57,32 @@ public class WebhookServiceImpl implements WebhookService {
                 case BANK_AVAILABILITY_UPDATED -> {
                     handleBankAvailabilityUpdated(webhookPayloadDto.getPayload());
                 }
+                case PAYMENT_SOURCE_BENEFICIARY_CREATED ->{
+                     handlePaymentSourceBeneficiaryCreated(webhookPayloadDto.getPayload());
+                }
+                case PAYMENT_SOURCE_CREATED -> {
+                    handlePaymentSourceCreated(webhookPayloadDto.getPayload());
+                }
             }
             log.info("Processing Complete: {}", logRow.getId());
         } catch (Exception e) {
             log.error("Error processing webhook {}: {}", logRow.getId(), e.getMessage());
         }
         return leanWebhookLogRepository.findById(logRow.getId()).orElse(logRow);
+    }
+
+    @Transactional
+    public void handlePaymentSourceCreated(Object payload) {
+        log.info("Handling payment_source.created with payload: {}", payload);
+        // Implementation for handling payment_source.created webhook
+        // Currently a placeholder as no specific instructions were provided
+    }
+
+    @Transactional
+    public void handlePaymentSourceBeneficiaryCreated(Object payload) {
+        log.info("Handling payment_source.beneficiary.created with payload: {}", payload);
+        // Implementation for handling payment_source.beneficiary.created webhook
+        // Currently a placeholder as no specific instructions were provided
     }
 
     @Transactional

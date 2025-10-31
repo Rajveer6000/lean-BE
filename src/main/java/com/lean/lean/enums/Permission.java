@@ -7,6 +7,7 @@ public enum Permission {
     IDENTITY("identity"),
     ACCOUNTS("accounts"),
     BALANCE("balance"),
+    PAYMENTS("payments"),
     TRANSACTIONS("transactions"),
     IDENTITIES("identities"),
     STANDING_ORDERS("standing_orders"),
