@@ -24,4 +24,10 @@ public class PaymentUpdatedDto {
     private String end_user_id;
     private String post_initiation_status;
     private String bank_transaction_reference;
+    private String currency;
+    private String payment_destination_id;
+    private String debtor_account_id;
+    private String failure_reason;
+    private String failure_code;
+    private String status_additional_info;
 }
