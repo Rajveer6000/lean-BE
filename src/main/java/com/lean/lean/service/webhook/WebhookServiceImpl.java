@@ -11,6 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Optional;
 
@@ -81,6 +82,15 @@ public class WebhookServiceImpl implements WebhookService {
                 case PAYMENT_INTENT_CREATED -> {
                     handlePaymentIntentCreated(webhookPayloadDto.getPayload());
                 }
+                case ENTITY_RECONNECTED -> {
+                    handleEntityReconnected(webhookPayloadDto.getPayload());
+                }
+                case RESULTS_READY -> {
+                    handleResultsReady(webhookPayloadDto.getPayload());
+                }
+                case PAYMENT_RECONCILIATION_UPDATED -> {
+                    handlePaymentReconciliationUpdated(webhookPayloadDto.getPayload());
+                }
             }
             log.info("Processing Complete: {}", logRow.getId());
         } catch (Exception e) {
@@ -100,24 +110,42 @@ public class WebhookServiceImpl implements WebhookService {
     @Transactional
     public void handlePaymentIntentCreated(Object payload) {
         log.info("Handling payment_intent.created with payload: {}", payload);
-        PaymentIntentCreatedDto dto;
         try {
-            if (payload instanceof String s) {
-                dto = objectMapper.readValue(s, PaymentIntentCreatedDto.class);
-            } else {
-                dto = objectMapper.readValue(objectMapper.writeValueAsString(payload), PaymentIntentCreatedDto.class);
+            PaymentIntentCreatedDto dto = convertPayload(payload, PaymentIntentCreatedDto.class);
+            if (dto == null || dto.getIntent_id() == null) {
+                log.warn("payment_intent.created payload missing intent_id. payload={}", payload);
+                return;
             }
-            LeanPaymentIntent paymentIntent = leanPaymentIntentRepository.findByPaymentIntentId(dto.getIntent_id()).orElseGet(LeanPaymentIntent::new);
+            LeanPaymentIntent paymentIntent = leanPaymentIntentRepository.findByPaymentIntentId(dto.getIntent_id())
+                    .orElseGet(LeanPaymentIntent::new);
             boolean isNew = (paymentIntent.getId() == null);
+            LocalDateTime now = LocalDateTime.now();
             paymentIntent.setPaymentIntentId(dto.getIntent_id());
-            paymentIntent.setAmount(dto.getAmount());
-            paymentIntent.setCurrency(dto.getCurrency());
-            paymentIntent.setStatus(dto.getStatus());
-            paymentIntent.setUpdatedAt(LocalDateTime.now());
-            if (isNew) paymentIntent.setCreatedAt(LocalDateTime.now());
-            if (isNew) paymentIntent.setInitiatedAt(LocalDateTime.now());
+            if (dto.getAmount() != null) {
+                paymentIntent.setAmount(dto.getAmount());
+            }
+            if (dto.getCurrency() != null) {
+                paymentIntent.setCurrency(dto.getCurrency());
+            }
+            if (dto.getCustomer_id() != null) {
+                paymentIntent.setLeanUserId(dto.getCustomer_id());
+            }
+            if (dto.getPayment_destination_id() != null) {
+                paymentIntent.setPaymentDestinationId(dto.getPayment_destination_id());
+            }
+            if (dto.getDescription() != null) {
+                paymentIntent.setDescription(dto.getDescription());
+            }
+            updateIntentStatus(paymentIntent, dto.getStatus(), now);
+            paymentIntent.setUpdatedAt(now);
+            if (isNew && paymentIntent.getCreatedAt() == null) {
+                paymentIntent.setCreatedAt(now);
+            }
+            if (isNew && paymentIntent.getInitiatedAt() == null) {
+                paymentIntent.setInitiatedAt(now);
+            }
             leanPaymentIntentRepository.save(paymentIntent);
-            log.info("payment_intent.created processed for payment_intent.id={}", dto.getIntent_id());
+            log.info("payment_intent.created processed for payment_intent.id={} (new={})", dto.getIntent_id(), isNew);
         } catch (Exception e) {
             log.error("Failed to parse payment_intent.created payload", e);
             return;
@@ -212,13 +240,57 @@ public class WebhookServiceImpl implements WebhookService {
     @Transactional
     public void handlePaymentCreated(Object payload) {
         log.info("Handling payment.created with payload: {}", payload);
-        PaymentCreatedDto dto;
         try {
-            if (payload instanceof String s) {
-                dto = objectMapper.readValue(s, PaymentCreatedDto.class);
-            } else {
-                dto = objectMapper.readValue(objectMapper.writeValueAsString(payload), PaymentCreatedDto.class);
+            PaymentCreatedDto dto = convertPayload(payload, PaymentCreatedDto.class);
+            if (dto == null || dto.getId() == null) {
+                log.warn("payment.created payload missing id. payload={}", payload);
+                return;
             }
+            LeanPayment payment = leanPaymentRepository.findByPaymentId(dto.getId()).orElseGet(LeanPayment::new);
+            boolean isNew = (payment.getId() == null);
+            if (isNew && !hasRequiredPaymentFields(dto.getIntent_id(), dto.getCustomer_id(), dto.getPayment_destination_id(),
+                    dto.getStatus(), dto.getAmount())) {
+                log.warn("payment.created payload missing mandatory fields for new payment. dto={}", dto);
+                return;
+            }
+            LocalDateTime now = LocalDateTime.now();
+            payment.setPaymentId(dto.getId());
+            if (dto.getIntent_id() != null) {
+                payment.setPaymentIntentId(dto.getIntent_id());
+            }
+            if (dto.getCustomer_id() != null) {
+                payment.setLeanUserId(dto.getCustomer_id());
+            }
+            if (dto.getPayment_destination_id() != null) {
+                payment.setPaymentDestinationId(dto.getPayment_destination_id());
+            }
+            Double amount = toDouble(dto.getAmount());
+            if (amount != null) {
+                payment.setAmount(amount);
+            } else if (isNew && payment.getAmount() == null) {
+                log.warn("payment.created payload missing amount for new payment. dto={}", dto);
+                return;
+            }
+            if (dto.getCurrency() != null) {
+                payment.setCurrency(dto.getCurrency());
+            }
+            if (dto.getBank_transaction_reference() != null) {
+                payment.setBankReference(dto.getBank_transaction_reference());
+            }
+            updatePaymentStatus(payment, dto.getStatus(), now);
+            if (hasText(dto.getStatus_additional_info())) {
+                payment.setFailureReason(dto.getStatus_additional_info());
+            }
+            if (isNew && payment.getInitiatedAt() == null) {
+                payment.setInitiatedAt(now);
+            }
+            if (isNew && payment.getCreatedAt() == null) {
+                payment.setCreatedAt(now);
+            }
+            payment.setUpdatedAt(now);
+            leanPaymentRepository.save(payment);
+            updateIntentFromPayment(dto.getIntent_id(), dto.getStatus(), now);
+            log.info("payment.created processed for payment.id={} (new={})", dto.getId(), isNew);
         } catch (Exception e) {
             log.error("Failed to parse payment.created payload", e);
             return;
@@ -228,17 +300,149 @@ public class WebhookServiceImpl implements WebhookService {
     @Transactional
     public void handlePaymentUpdated(Object payload) {
         log.info("Handling payment.updated with payload: {}", payload);
-        PaymentCreatedDto dto;
         try {
-            if (payload instanceof String s) {
-                dto = objectMapper.readValue(s, PaymentCreatedDto.class);
-            } else {
-                dto = objectMapper.readValue(objectMapper.writeValueAsString(payload), PaymentCreatedDto.class);
+            PaymentUpdatedDto dto = convertPayload(payload, PaymentUpdatedDto.class);
+            if (dto == null || dto.getId() == null) {
+                log.warn("payment.updated payload missing id. payload={}", payload);
+                return;
             }
+            LeanPayment payment = leanPaymentRepository.findByPaymentId(dto.getId()).orElseGet(LeanPayment::new);
+            boolean isNew = (payment.getId() == null);
+            String effectiveStatus = coalesceStatus(dto.getPost_initiation_status(), dto.getStatus());
+            if (isNew && !hasRequiredPaymentFields(dto.getIntent_id(), dto.getCustomer_id(), dto.getPayment_destination_id(),
+                    effectiveStatus, dto.getAmount())) {
+                log.warn("payment.updated payload missing mandatory fields for new payment. dto={}", dto);
+                return;
+            }
+            LocalDateTime now = LocalDateTime.now();
+            payment.setPaymentId(dto.getId());
+            if (dto.getIntent_id() != null) {
+                payment.setPaymentIntentId(dto.getIntent_id());
+            }
+            if (dto.getCustomer_id() != null) {
+                payment.setLeanUserId(dto.getCustomer_id());
+            }
+            if (dto.getPayment_destination_id() != null) {
+                payment.setPaymentDestinationId(dto.getPayment_destination_id());
+            }
+            Double amount = toDouble(dto.getAmount());
+            if (amount != null) {
+                payment.setAmount(amount);
+            } else if (isNew && payment.getAmount() == null) {
+                log.warn("payment.updated payload missing amount for new payment. dto={}", dto);
+                return;
+            }
+            if (dto.getCurrency() != null) {
+                payment.setCurrency(dto.getCurrency());
+            }
+            if (dto.getBank_transaction_reference() != null) {
+                payment.setBankReference(dto.getBank_transaction_reference());
+            }
+            updatePaymentStatus(payment, effectiveStatus, now);
+            String failureReason = coalesceNonBlank(dto.getFailure_reason(), dto.getStatus_additional_info());
+            if (hasText(failureReason)) {
+                payment.setFailureReason(failureReason);
+            }
+            if (hasText(dto.getFailure_code())) {
+                payment.setFailureCode(dto.getFailure_code());
+            }
+            if (isNew && payment.getInitiatedAt() == null) {
+                payment.setInitiatedAt(now);
+            }
+            if (isNew && payment.getCreatedAt() == null) {
+                payment.setCreatedAt(now);
+            }
+            payment.setUpdatedAt(now);
+            leanPaymentRepository.save(payment);
+            updateIntentFromPayment(dto.getIntent_id(), effectiveStatus, now);
+            log.info("payment.updated processed for payment.id={} (new={})", dto.getId(), isNew);
         } catch (Exception e) {
-            log.error("Failed to parse payment.created payload", e);
+            log.error("Failed to parse payment.updated payload", e);
             return;
         }
+    }
+
+    private void updateIntentFromPayment(String intentId, String status, LocalDateTime timestamp) {
+        if (intentId == null || intentId.isBlank()) {
+            return;
+        }
+        leanPaymentIntentRepository.findByPaymentIntentId(intentId)
+                .ifPresent(intent -> {
+                    updateIntentStatus(intent, status, timestamp);
+                    intent.setUpdatedAt(timestamp);
+                    leanPaymentIntentRepository.save(intent);
+                });
+    }
+
+    private boolean hasRequiredPaymentFields(String intentId,
+                                             String customerId,
+                                             String destinationId,
+                                             String status,
+                                             BigDecimal amount) {
+        return intentId != null && !intentId.isBlank()
+                && customerId != null && !customerId.isBlank()
+                && destinationId != null && !destinationId.isBlank()
+                && status != null && !status.isBlank()
+                && amount != null;
+    }
+
+    private Double toDouble(BigDecimal amount) {
+        return amount != null ? amount.doubleValue() : null;
+    }
+
+    private void updatePaymentStatus(LeanPayment payment, String status, LocalDateTime now) {
+        if (!hasText(status)) {
+            return;
+        }
+        payment.setStatus(status);
+    }
+
+    private void updateIntentStatus(LeanPaymentIntent intent, String status, LocalDateTime now) {
+        if (!hasText(status)) {
+            return;
+        }
+        intent.setStatus(status);
+    }
+
+    private String coalesceStatus(String... statuses) {
+        if (statuses == null) {
+            return null;
+        }
+        for (String status : statuses) {
+            if (hasText(status)) {
+                return status;
+            }
+        }
+        return null;
+    }
+
+    private String coalesceNonBlank(String... values) {
+        if (values == null) {
+            return null;
+        }
+        for (String value : values) {
+            if (hasText(value)) {
+                return value;
+            }
+        }
+        return null;
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.trim().isEmpty();
+    }
+
+    private <T> T convertPayload(Object payload, Class<T> targetType) throws Exception {
+        if (payload == null) {
+            return null;
+        }
+        if (targetType.isInstance(payload)) {
+            return targetType.cast(payload);
+        }
+        if (payload instanceof String s) {
+            return objectMapper.readValue(s, targetType);
+        }
+        return objectMapper.readValue(objectMapper.writeValueAsString(payload), targetType);
     }
 
     @Transactional
@@ -270,22 +474,37 @@ public class WebhookServiceImpl implements WebhookService {
 
     @Transactional
     public void handleEntityCreated(Object payload) {
-        log.info("Handling entity.created with payload: {}", payload);
+        processEntityLifecycleEvent(payload, "entity.created");
+    }
+
+    @Transactional
+    public void handleEntityReconnected(Object payload) {
+        processEntityLifecycleEvent(payload, "entity.reconnected");
+    }
+
+    @Transactional
+    public void handleResultsReady(Object payload) {
+        log.info("Handling results.ready with payload: {}", payload);
+    }
+
+    @Transactional
+    public void handlePaymentReconciliationUpdated(Object payload) {
+        log.info("Handling payment.reconciliation.updated with payload: {}", payload);
+    }
+
+    private void processEntityLifecycleEvent(Object payload, String eventName) {
+        log.info("Handling {} with payload: {}", eventName, payload);
 
         EntityCreatedDTO dto;
         try {
-            if (payload instanceof String s) {
-                dto = objectMapper.readValue(s, EntityCreatedDTO.class);
-            } else {
-                dto = objectMapper.readValue(objectMapper.writeValueAsString(payload), EntityCreatedDTO.class);
-            }
+            dto = convertPayload(payload, EntityCreatedDTO.class);
         } catch (Exception e) {
-            log.error("Failed to parse entity.created payload", e);
+            log.error("Failed to parse {} payload", eventName, e);
             return;
         }
 
         if (dto == null || dto.getId() == null || dto.getBankDetails() == null || dto.getBankDetails().getIdentifier() == null) {
-            log.warn("Missing required fields (entity id / bank_details / bank identifier); skipping. dto={}", dto);
+            log.warn("{} missing required fields (entity id / bank_details / bank identifier); skipping. dto={}", eventName, dto);
             return;
         }
 
@@ -299,26 +518,30 @@ public class WebhookServiceImpl implements WebhookService {
         bank.setLogo(bd.getLogo());
         bank.setMainColor(bd.getMainColor());
         bank.setBackgroundColor(bd.getBackgroundColor());
-        if (newBank) bank.setCreatedAt(now);
+        if (newBank) {
+            bank.setCreatedAt(now);
+        }
         bank.setUpdatedAt(now);
         bank = leanBankRepository.save(bank);
 
         LeanEntity entity = leanEntityRepository.findByEntityId(dto.getId()).orElseGet(LeanEntity::new);
         boolean newEntity = (entity.getId() == null);
         entity.setEntityId(dto.getId());
-        entity.setUserId(dto.getAppUserId());                 // app_user_id → user_id
-        entity.setBankId(bank.getId());                 // storing bank.identifier as String (per your schema)
+        entity.setUserId(dto.getAppUserId());
+        entity.setBankId(bank.getId());
         try {
-            entity.setPermissions(objectMapper.writeValueAsString(dto.getPermissions())); // JSON string
+            entity.setPermissions(objectMapper.writeValueAsString(dto.getPermissions()));
         } catch (Exception e) {
             entity.setPermissions(null);
         }
-        if (newEntity) entity.setCreatedAt(now);
+        if (newEntity) {
+            entity.setCreatedAt(now);
+        }
         entity.setUpdatedAt(now);
         entity = leanEntityRepository.save(entity);
 
-        log.info("entity.created processed. bank.identifier={} (dbId={}), entity.entity_id={}",
-                bank.getIdentifier(), bank.getId(), entity.getEntityId());
+        log.info("{} processed. bank.identifier={} (dbId={}), entity.entity_id={}",
+                eventName, bank.getIdentifier(), bank.getId(), entity.getEntityId());
     }
 
 }

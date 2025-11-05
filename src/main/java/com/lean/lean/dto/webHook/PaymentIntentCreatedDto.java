@@ -20,4 +20,7 @@ public class PaymentIntentCreatedDto {
     private String status;
     private String currency;
     private String intent_id;
+    private String customer_id;
+    private String payment_destination_id;
+    private String description;
 }
