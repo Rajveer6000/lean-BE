@@ -67,10 +67,16 @@ public class LeanConnectController {
     public Object getUserTransactions(
             @RequestParam Long userId,
             @RequestParam String accountId,
-            @RequestParam(required = false) LocalDate fromDate,
-            @RequestParam(required = false) LocalDate toDate) {
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate) {
 
         return userLeanService.getUserTransactions(userId, accountId, fromDate, toDate);
     }
 
+
+    @GetMapping("/get-payment-sources")
+    public Object getuserPaymentSources(
+            @RequestParam Long userId) {
+        return userLeanService.getuserPaymentSources(userId);
+    }
 }

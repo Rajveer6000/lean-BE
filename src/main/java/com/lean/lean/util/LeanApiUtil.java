@@ -289,6 +289,21 @@ public class LeanApiUtil {
         JSONObject responseBody = new JSONObject(resp.getBody());
         return responseBody.toMap();
     }
+    public Object getPaymentSources(String leanUserID, String accessToken) {
+        String url = apiUrl + "/customers/v1/" + leanUserID + "/payment-sources";
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Authorization", "Bearer " + accessToken);
+        headers.set("Accept", "*/*");
+        headers.set("Content-Type", "application/json");
+        ResponseEntity<String> resp =
+                exchangeWithLog(url, HttpMethod.GET, headers, null, String.class);
+        JSONArray responseArray = new JSONArray(resp.getBody());
+        List<Map<String, Object>> paymentSources = new ArrayList<>();
+        for (int i = 0; i < responseArray.length(); i++) {
+            paymentSources.add(responseArray.getJSONObject(i).toMap());
+        }
+        return paymentSources;
+    }
 
     public Object getPaymentSource(String accessToken, String leanUserId, String paymentSourceId) {
         String url = apiUrl + "/customers/v1/" + leanUserId + "/payment-sources/" + paymentSourceId;
