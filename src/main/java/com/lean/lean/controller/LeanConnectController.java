@@ -3,6 +3,7 @@ package com.lean.lean.controller;
 import com.lean.lean.dto.UserLeanConnectResponse;
 import com.lean.lean.service.UserLeanService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -39,21 +40,22 @@ public class LeanConnectController {
         return userLeanService.getAccountBalances(userId, accountId);
     }
 
-    @PostMapping("/income ")
+    @PostMapping("/income")
     public Object getIncomeDetails(
             @RequestParam Long userId,
-            @RequestParam String startDate) {
-        return userLeanService.getIncomeDetails(userId, startDate);
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false, defaultValue = "ALL") String incomeType) {
+        return userLeanService.getIncomeDetails(userId, startDate, incomeType);
     }
 
     @GetMapping("/expenses")
     public Object getExpensesDetails(
             @RequestParam Long userId,
-            @RequestParam String startDate) {
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate) {
         return userLeanService.getExpensesDetails(userId, startDate);
     }
 
-    @GetMapping("/name-verification")
+    @PostMapping("/name-verification")
     public Object getNameVerification(
             @RequestParam Long userId,
             @RequestParam String fullName) {
