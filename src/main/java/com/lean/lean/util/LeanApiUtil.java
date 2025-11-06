@@ -16,6 +16,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
 import org.springframework.http.*;
 import org.json.JSONObject;
 
@@ -184,6 +185,69 @@ public class LeanApiUtil {
         return responseBody.toMap();
     }
 
+    public Object getIncomeInsights(String entityId,
+                                    LocalDate startDate,
+                                    String incomeType,
+                                    String accessToken) {
+        String url = apiUrl + "/insights/v2/income";
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Authorization", "Bearer " + accessToken);
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setAccept(List.of(MediaType.APPLICATION_JSON));
+
+        JSONObject body = new JSONObject()
+                .put("entity_id", entityId)
+                .put("income_type", incomeType == null || incomeType.isBlank() ? "ALL" : incomeType)
+                .put("async", false);
+        if (startDate != null) {
+            body.put("start_date", startDate.toString());
+        }
+
+        ResponseEntity<String> response =
+                exchangeWithLog(url, HttpMethod.POST, headers, body.toString(), String.class);
+        return parseJsonResponse(response.getBody());
+    }
+
+    public Object getExpensesInsights(String entityId,
+                                      LocalDate startDate,
+                                      String accessToken) {
+        UriComponentsBuilder builder = UriComponentsBuilder
+                .fromHttpUrl(apiUrl + "/insights/v2/expenses")
+                .queryParam("entity_id", entityId)
+                .queryParam("async", false);
+        if (startDate != null) {
+            builder.queryParam("start_date", startDate.toString());
+        }
+        String url = builder.build(true).toUriString();
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Authorization", "Bearer " + accessToken);
+        headers.setAccept(List.of(MediaType.APPLICATION_JSON));
+
+        ResponseEntity<String> response =
+                exchangeWithLog(url, HttpMethod.GET, headers, null, String.class);
+        return parseJsonResponse(response.getBody());
+    }
+
+    public Object verifyName(String entityId,
+                             String fullName,
+                             String accessToken) {
+        String url = apiUrl + "/insights/v1/name-verification";
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Authorization", "Bearer " + accessToken);
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setAccept(List.of(MediaType.APPLICATION_JSON));
+
+        JSONObject body = new JSONObject()
+                .put("entity_id", entityId)
+                .put("full_name", fullName)
+                .put("async", false);
+
+        ResponseEntity<String> response =
+                exchangeWithLog(url, HttpMethod.POST, headers, body.toString(), String.class);
+        return parseJsonResponse(response.getBody());
+    }
+
     public DestinationsBeneficiaryDto createDestinationsBeneficiary(AddDestinationsBeneficiaryDto beneficiary, String accessToken) {
         String url = apiUrl + "/payments/v1/destinations";
         HttpHeaders headers = new HttpHeaders();
@@ -237,6 +301,23 @@ public class LeanApiUtil {
         JSONObject responseBody = new JSONObject(resp.getBody());
         return responseBody.toMap();
     }
+    private Object parseJsonResponse(String responseBody) {
+        if (responseBody == null) {
+            return Map.of();
+        }
+        String trimmed = responseBody.trim();
+        if (trimmed.isEmpty()) {
+            return Map.of();
+        }
+        if (trimmed.startsWith("{")) {
+            return new JSONObject(trimmed).toMap();
+        }
+        if (trimmed.startsWith("[")) {
+            return new JSONArray(trimmed).toList();
+        }
+        return trimmed;
+    }
+
     // ---------- Centralized logging wrapper ----------
 
     private <T> ResponseEntity<T> exchangeWithLog(
