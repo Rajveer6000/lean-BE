@@ -8,6 +8,7 @@ import com.lean.lean.repository.LeanBankRepository;
 import com.lean.lean.repository.LeanEntityRepository;
 import com.lean.lean.repository.LeanUserRepository;
 import com.lean.lean.repository.UserRepository;
+import com.lean.lean.service.LeanReportService.ReportLink;
 import com.lean.lean.util.LeanApiUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -40,6 +41,9 @@ public class UserLeanService {
 
     @Autowired
     private LeanApiUtil leanApiUtil;
+
+    @Autowired
+    private LeanReportService leanReportService;
 
     public UserLeanConnectResponse connectUser(Long userId) {
         User user = userRepository.findById(userId)
@@ -119,12 +123,19 @@ public class UserLeanService {
         String accessToken = leanApiUtil.getAccessToken();
         log.info("Fetching income insights for entityId={} starting {} (type={})",
                 leanEntity.getEntityId(), startDate, normalizedIncomeType);
-        return leanApiUtil.getIncomeInsights(
+        Object response = leanApiUtil.getIncomeInsights(
                 leanEntity.getEntityId(),
                 startDate,
                 normalizedIncomeType,
                 accessToken
         );
+        ReportLink reportLink = leanReportService.captureIncomeReport(
+                userId,
+                startDate,
+                normalizedIncomeType,
+                response
+        );
+        return attachReportLink(response, reportLink);
     }
 
     public Object getExpensesDetails(Long userId, LocalDate startDate) {
@@ -143,11 +154,13 @@ public class UserLeanService {
         String accessToken = leanApiUtil.getAccessToken();
         log.info("Fetching expenses insights for entityId={} starting {}",
                 leanEntity.getEntityId(), startDate);
-        return leanApiUtil.getExpensesInsights(
+        Object response = leanApiUtil.getExpensesInsights(
                 leanEntity.getEntityId(),
                 startDate,
                 accessToken
         );
+        ReportLink reportLink = leanReportService.captureExpenseReport(userId, startDate, response);
+        return attachReportLink(response, reportLink);
     }
 
     public Object getNameVerification(Long userId, String fullName) {
@@ -211,7 +224,28 @@ public class UserLeanService {
                 toDate,
                 accessToken
         );
-        return applyDateFilters(response, fromDate, toDate);
+        Object filtered = applyDateFilters(response, fromDate, toDate);
+        ReportLink reportLink = leanReportService.captureTransactionReport(
+                userId,
+                accountId,
+                fromDate,
+                toDate,
+                filtered
+        );
+        return attachReportLink(filtered, reportLink);
+    }
+
+    private Object attachReportLink(Object response, ReportLink reportLink) {
+        if (reportLink == null || !(response instanceof Map<?, ?>)) {
+            return response;
+        }
+        @SuppressWarnings("unchecked")
+        Map<String, Object> responseMap = new LinkedHashMap<>((Map<String, Object>) response);
+        responseMap.put("report_file_path", reportLink.objectKey());
+        if (reportLink.signedUrl() != null) {
+            responseMap.put("report_download_url", reportLink.signedUrl());
+        }
+        return responseMap;
     }
 
     private Object applyDateFilters(Object response, LocalDate fromDate, LocalDate toDate) {
