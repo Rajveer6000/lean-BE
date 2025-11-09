@@ -7,20 +7,30 @@ import com.lean.lean.dto.AddDestinationsBeneficiaryDto;
 import com.lean.lean.dto.IntentDto;
 import com.lean.lean.dto.LeanCustomerRegResponse;
 import com.lean.lean.dto.webHook.DestinationsBeneficiaryDto;
+import com.lean.lean.enums.PaymentIntentStatus;
+import com.lean.lean.enums.ProofOfAddressDocumentType;
 import com.lean.lean.service.LeanApiLogService;
 import lombok.extern.slf4j.Slf4j;
 import org.json.JSONArray;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.stereotype.Component;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.util.UriComponentsBuilder;
 import org.springframework.http.*;
 import org.json.JSONObject;
 
+import java.io.IOException;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -316,6 +326,152 @@ public class LeanApiUtil {
         JSONObject responseBody = new JSONObject(resp.getBody());
         return responseBody.toMap();
     }
+
+    public Object deletePaymentSource(String leanUserId,
+                                      String paymentSourceId,
+                                      String reason,
+                                      String accessToken) {
+        String url = apiUrl + "/customers/v1/" + leanUserId + "/payment-sources/" + paymentSourceId;
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Authorization", "Bearer " + accessToken);
+        headers.setAccept(List.of(MediaType.APPLICATION_JSON));
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        JSONObject body = new JSONObject().put("reason", reason);
+        ResponseEntity<String> resp =
+                exchangeWithLog(url, HttpMethod.DELETE, headers, body.toString(), String.class);
+        return parseJsonResponse(resp.getBody());
+    }
+
+    public Object getPaymentById(String paymentId, String accessToken) {
+        String url = apiUrl + "/payments/v1/" + paymentId;
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Authorization", "Bearer " + accessToken);
+        headers.setAccept(List.of(MediaType.APPLICATION_JSON));
+
+        ResponseEntity<String> resp =
+                exchangeWithLog(url, HttpMethod.GET, headers, null, String.class);
+        return parseJsonResponse(resp.getBody());
+    }
+
+    public Object listPaymentIntents(String accessToken,
+                                     String customerId,
+                                     Integer page,
+                                     Integer size,
+                                     LocalDate from,
+                                     LocalDate to,
+                                     PaymentIntentStatus status) {
+        UriComponentsBuilder builder = UriComponentsBuilder
+                .fromHttpUrl(apiUrl + "/payments/v1/intents");
+        if (page != null) {
+            builder.queryParam("page", page);
+        }
+        if (size != null) {
+            builder.queryParam("size", size);
+        }
+        if (customerId != null) {
+            builder.queryParam("customer_id", customerId);
+        }
+        if (from != null) {
+            builder.queryParam("from", toStartOfDayInstant(from));
+        }
+        if (to != null) {
+            builder.queryParam("to", toEndOfDayInstant(to));
+        }
+        if (status != null) {
+            builder.queryParam("status", status.getValue());
+        }
+
+        String url = builder.build(true).toUriString();
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Authorization", "Bearer " + accessToken);
+        headers.setAccept(List.of(MediaType.APPLICATION_JSON));
+
+        ResponseEntity<String> resp =
+                exchangeWithLog(url, HttpMethod.GET, headers, null, String.class);
+        return parseJsonResponse(resp.getBody());
+    }
+
+    public Object getPaymentIntentById(String paymentIntentId, String accessToken) {
+        String url = apiUrl + "/payments/v1/intents/" + paymentIntentId;
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Authorization", "Bearer " + accessToken);
+        headers.setAccept(List.of(MediaType.APPLICATION_JSON));
+
+        ResponseEntity<String> resp =
+                exchangeWithLog(url, HttpMethod.GET, headers, null, String.class);
+        return parseJsonResponse(resp.getBody());
+    }
+
+    public Object getCustomerEntity(String accessToken, String customerId, String entityId) {
+        String url = apiUrl + "/customers/v1/" + customerId + "/entities/" + entityId;
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Authorization", "Bearer " + accessToken);
+        headers.setAccept(List.of(MediaType.APPLICATION_JSON));
+
+        ResponseEntity<String> resp =
+                exchangeWithLog(url, HttpMethod.GET, headers, null, String.class);
+        return parseJsonResponse(resp.getBody());
+    }
+
+    public Object deleteCustomerEntity(String accessToken,
+                                       String customerId,
+                                       String entityId,
+                                       String reason) {
+        String url = apiUrl + "/customers/v1/" + customerId + "/entities/" + entityId;
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Authorization", "Bearer " + accessToken);
+        headers.setAccept(List.of(MediaType.APPLICATION_JSON));
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        JSONObject body = new JSONObject().put("reason", reason);
+        ResponseEntity<String> resp =
+                exchangeWithLog(url, HttpMethod.DELETE, headers, body.toString(), String.class);
+        return parseJsonResponse(resp.getBody());
+    }
+
+    public Object uploadProofOfAddress(String accessToken,
+                                       String customerId,
+                                       ProofOfAddressDocumentType documentType,
+                                       String fullName,
+                                       Map<String, Object> referenceData,
+                                       MultipartFile file) {
+        String url = apiUrl + "/kyc/v1/customers/" + customerId + "/proof-of-address";
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Authorization", "Bearer " + accessToken);
+        headers.setContentType(MediaType.MULTIPART_FORM_DATA);
+
+        MultiValueMap<String, Object> formData = new LinkedMultiValueMap<>();
+        formData.add("document_type", documentType.name());
+        formData.add("full_name", fullName);
+
+        HttpHeaders referenceHeaders = new HttpHeaders();
+        referenceHeaders.setContentType(MediaType.APPLICATION_JSON);
+        JSONObject referencePayload = new JSONObject(referenceData != null ? referenceData : Map.of());
+        formData.add("reference_data", new HttpEntity<>(referencePayload.toString(), referenceHeaders));
+
+        try {
+            String fileName = file.getOriginalFilename() != null ? file.getOriginalFilename() : "proof-of-address";
+            ByteArrayResource resource = new ByteArrayResource(file.getBytes()) {
+                @Override
+                public String getFilename() {
+                    return fileName;
+                }
+            };
+            HttpHeaders fileHeaders = new HttpHeaders();
+            MediaType mediaType = file.getContentType() != null
+                    ? MediaType.parseMediaType(file.getContentType())
+                    : MediaType.APPLICATION_OCTET_STREAM;
+            fileHeaders.setContentType(mediaType);
+            formData.add("file", new HttpEntity<>(resource, fileHeaders));
+        } catch (IOException e) {
+            throw new RuntimeException("Unable to read proof-of-address file", e);
+        }
+
+        ResponseEntity<String> resp =
+                exchangeWithLog(url, HttpMethod.POST, headers, formData, String.class);
+        return parseJsonResponse(resp.getBody());
+    }
     private Object parseJsonResponse(String responseBody) {
         if (responseBody == null) {
             return Map.of();
@@ -339,10 +495,10 @@ public class LeanApiUtil {
             String url,
             HttpMethod method,
             HttpHeaders headers,
-            String requestBody,
+            Object requestBody,
             Class<T> responseType
     ) {
-        String maskedReq = logService.maskSecrets(requestBody);
+        String maskedReq = logService.maskSecrets(stringifyRequestBody(requestBody));
         LeanApiLog.LeanApiLogBuilder logBuilder = LeanApiLog.builder()
                 .endpoint(url)
                 .requestBody(maskedReq);
@@ -351,7 +507,7 @@ public class LeanApiUtil {
         log.info("Headers: {}", logService.maskSecrets(headers.toString()));
         log.info("Expected Response Type: {}", responseType.getSimpleName());
         try {
-            HttpEntity<String> entity = new HttpEntity<>(requestBody, headers);
+            HttpEntity<Object> entity = new HttpEntity<>(requestBody, headers);
             ResponseEntity<T> response = restTemplate.exchange(url, method, entity, responseType);
 
             String respString = null;
@@ -394,6 +550,29 @@ public class LeanApiUtil {
             logService.save(logBuilder.build());
             throw e;
         }
+    }
+
+    private String stringifyRequestBody(Object requestBody) {
+        if (requestBody == null) {
+            return null;
+        }
+        if (requestBody instanceof String s) {
+            return s;
+        }
+        if (requestBody instanceof MultiValueMap<?, ?> multiValueMap) {
+            return multiValueMap.toString();
+        }
+        return logService.toJson(requestBody);
+    }
+
+    private String toStartOfDayInstant(LocalDate date) {
+        Instant instant = date.atStartOfDay(ZoneOffset.UTC).toInstant();
+        return instant.toString();
+    }
+
+    private String toEndOfDayInstant(LocalDate date) {
+        Instant instant = date.atTime(LocalTime.MAX).atOffset(ZoneOffset.UTC).toInstant();
+        return instant.toString();
     }
 
 

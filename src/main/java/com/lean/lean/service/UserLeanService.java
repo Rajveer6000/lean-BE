@@ -1,9 +1,13 @@
 package com.lean.lean.service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lean.lean.dao.LeanEntity;
 import com.lean.lean.dao.LeanUser;
 import com.lean.lean.dao.User;
 import com.lean.lean.dto.UserLeanConnectResponse;
+import com.lean.lean.enums.PaymentIntentStatus;
+import com.lean.lean.enums.ProofOfAddressDocumentType;
 import com.lean.lean.repository.LeanBankRepository;
 import com.lean.lean.repository.LeanEntityRepository;
 import com.lean.lean.repository.LeanUserRepository;
@@ -13,7 +17,9 @@ import com.lean.lean.util.LeanApiUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -21,6 +27,9 @@ import java.util.Map;
 @Slf4j
 @Service
 public class UserLeanService {
+
+    private static final String DEFAULT_DELETE_REASON = "USER_REQUESTED";
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Autowired
     private UserRepository userRepository;
@@ -195,6 +204,118 @@ public class UserLeanService {
         );
     }
 
+    public Object deletePaymentSource(Long userId, String paymentSourceId, String reason) {
+        if (paymentSourceId == null || paymentSourceId.isBlank()) {
+            throw new IllegalArgumentException("paymentSourceId is required");
+        }
+        LeanUser leanUser = requireLeanUser(userId);
+        String resolvedReason = (reason == null || reason.isBlank()) ? DEFAULT_DELETE_REASON : reason;
+        String accessToken = leanApiUtil.getAccessToken();
+        return leanApiUtil.deletePaymentSource(
+                leanUser.getLeanUserId(),
+                paymentSourceId,
+                resolvedReason,
+                accessToken
+        );
+    }
+
+    public Object getPaymentDetails(Long userId, String paymentId) {
+        if (paymentId == null || paymentId.isBlank()) {
+            throw new IllegalArgumentException("paymentId is required");
+        }
+        requireLeanUser(userId);
+        String accessToken = leanApiUtil.getAccessToken();
+        return leanApiUtil.getPaymentById(paymentId, accessToken);
+    }
+
+    public Object listPaymentIntents(Long userId,
+                                     Integer page,
+                                     Integer size,
+                                     LocalDate from,
+                                     LocalDate to,
+                                     PaymentIntentStatus status) {
+        if (from != null && to != null && from.isAfter(to)) {
+            throw new IllegalArgumentException("from must be on or before to when both are provided");
+        }
+        LeanUser leanUser = requireLeanUser(userId);
+        String accessToken = leanApiUtil.getAccessToken();
+        return leanApiUtil.listPaymentIntents(
+                accessToken,
+                leanUser.getLeanUserId(),
+                page,
+                size,
+                from,
+                to,
+                status
+        );
+    }
+
+    public Object getPaymentIntentDetails(Long userId, String paymentIntentId) {
+        if (paymentIntentId == null || paymentIntentId.isBlank()) {
+            throw new IllegalArgumentException("paymentIntentId is required");
+        }
+        requireLeanUser(userId);
+        String accessToken = leanApiUtil.getAccessToken();
+        return leanApiUtil.getPaymentIntentById(paymentIntentId, accessToken);
+    }
+
+    public Object getCustomerEntityDetails(Long userId, String entityId) {
+        if (entityId == null || entityId.isBlank()) {
+            throw new IllegalArgumentException("entityId is required");
+        }
+        LeanUser leanUser = requireLeanUser(userId);
+        validateEntityOwnership(userId, entityId);
+        String accessToken = leanApiUtil.getAccessToken();
+        return leanApiUtil.getCustomerEntity(
+                accessToken,
+                leanUser.getLeanUserId(),
+                entityId
+        );
+    }
+
+    public Object deleteCustomerEntity(Long userId, String entityId, String reason) {
+        if (entityId == null || entityId.isBlank()) {
+            throw new IllegalArgumentException("entityId is required");
+        }
+        LeanUser leanUser = requireLeanUser(userId);
+        validateEntityOwnership(userId, entityId);
+        String resolvedReason = (reason == null || reason.isBlank()) ? DEFAULT_DELETE_REASON : reason;
+        String accessToken = leanApiUtil.getAccessToken();
+        return leanApiUtil.deleteCustomerEntity(
+                accessToken,
+                leanUser.getLeanUserId(),
+                entityId,
+                resolvedReason
+        );
+    }
+
+    public Object uploadProofOfAddress(Long userId,
+                                       ProofOfAddressDocumentType documentType,
+                                       String fullName,
+                                       String referenceDataJson,
+                                       MultipartFile file) {
+        if (documentType == null) {
+            throw new IllegalArgumentException("documentType is required");
+        }
+        if (fullName == null || fullName.isBlank()) {
+            throw new IllegalArgumentException("fullName is required");
+        }
+        if (file == null || file.isEmpty()) {
+            throw new IllegalArgumentException("file is required");
+        }
+        Map<String, Object> referenceData = parseReferenceData(referenceDataJson);
+        LeanUser leanUser = requireLeanUser(userId);
+        String accessToken = leanApiUtil.getAccessToken();
+        return leanApiUtil.uploadProofOfAddress(
+                accessToken,
+                leanUser.getLeanUserId(),
+                documentType,
+                fullName,
+                referenceData,
+                file
+        );
+    }
+
 
     public Object getUserTransactions(Long userId, String accountId, LocalDate fromDate, LocalDate toDate) {
         User user = userRepository.findById(userId)
@@ -240,6 +361,36 @@ public class UserLeanService {
             responseMap.put("report_download_url", reportLink.signedUrl());
         }
         return responseMap;
+    }
+
+    private LeanUser requireLeanUser(Long userId) {
+        userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        LeanUser leanUser = leanUserRepository.findFirstByUserId(userId);
+        if (leanUser == null) {
+            throw new RuntimeException("LeanUser not found for user ID: " + userId);
+        }
+        return leanUser;
+    }
+
+    private void validateEntityOwnership(Long userId, String entityId) {
+        leanEntityRepository.findByEntityId(entityId).ifPresent(entity -> {
+            String ownerId = entity.getUserId();
+            if (ownerId != null && !ownerId.equals(userId.toString())) {
+                throw new RuntimeException("Entity does not belong to user ID: " + userId);
+            }
+        });
+    }
+
+    private Map<String, Object> parseReferenceData(String referenceDataJson) {
+        if (referenceDataJson == null || referenceDataJson.isBlank()) {
+            throw new IllegalArgumentException("reference_data is required");
+        }
+        try {
+            return objectMapper.readValue(referenceDataJson, new TypeReference<>() {});
+        } catch (IOException e) {
+            throw new IllegalArgumentException("reference_data must be a valid JSON object", e);
+        }
     }
 
 }
