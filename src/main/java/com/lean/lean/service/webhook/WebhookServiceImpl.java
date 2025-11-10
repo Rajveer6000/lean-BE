@@ -264,7 +264,7 @@ public class WebhookServiceImpl implements WebhookService {
             if (dto.getPayment_destination_id() != null) {
                 payment.setPaymentDestinationId(dto.getPayment_destination_id());
             }
-            Double amount = toDouble(dto.getAmount());
+            BigDecimal amount = dto.getAmount();
             if (amount != null) {
                 payment.setAmount(amount);
             } else if (isNew && payment.getAmount() == null) {
@@ -325,7 +325,7 @@ public class WebhookServiceImpl implements WebhookService {
             if (dto.getPayment_destination_id() != null) {
                 payment.setPaymentDestinationId(dto.getPayment_destination_id());
             }
-            Double amount = toDouble(dto.getAmount());
+            BigDecimal amount = dto.getAmount();
             if (amount != null) {
                 payment.setAmount(amount);
             } else if (isNew && payment.getAmount() == null) {
@@ -384,10 +384,6 @@ public class WebhookServiceImpl implements WebhookService {
                 && destinationId != null && !destinationId.isBlank()
                 && status != null && !status.isBlank()
                 && amount != null;
-    }
-
-    private Double toDouble(BigDecimal amount) {
-        return amount != null ? amount.doubleValue() : null;
     }
 
     private void updatePaymentStatus(LeanPayment payment, String status, LocalDateTime now) {
