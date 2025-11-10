@@ -5,6 +5,7 @@ import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
@@ -33,8 +34,8 @@ public class LeanPayment {
     @Column(name = "status", nullable = false)
     private String status;
 
-    @Column(name = "amount", nullable = false)
-    private Double amount;
+    @Column(name = "amount", nullable = false, precision = 15, scale = 2)
+    private BigDecimal amount;
 
     @Column(name = "currency", length = 3)
     private String currency = "AED";

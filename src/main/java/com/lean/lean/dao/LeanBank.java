@@ -6,7 +6,6 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.Instant;
 import java.time.LocalDateTime;
 
 @Data
@@ -26,7 +25,7 @@ public class LeanBank {
     @Column(name = "identifier")
     private String identifier;
 
-    @Column(name = "logo", columnDefinition = "json")
+    @Column(name = "logo", length = 512)
     private String logo;
 
     @Column(name = "main_color")

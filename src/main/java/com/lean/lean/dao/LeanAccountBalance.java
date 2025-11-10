@@ -4,7 +4,6 @@ import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.sql.Timestamp;
 import java.time.LocalDateTime;
 
 @Entity
@@ -25,6 +24,7 @@ public class LeanAccountBalance {
     private Double balance;
     @Column(name = "currencycode")
     private String currencyCode;
+    @Enumerated(EnumType.STRING)
     @Column(name = "accounttype")
     private AccountType accountType;
 
