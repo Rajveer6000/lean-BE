@@ -19,7 +19,7 @@ public class LeanPaymentIntent {
     @Column(name = "id")
     private Long id;
 
-    @Column(name = "payment_intent_id", nullable = false, unique = true)
+    @Column(name = "payment_intent_id", nullable = false)
     private String paymentIntentId;
 
     @Column(name = "lean_user_id")

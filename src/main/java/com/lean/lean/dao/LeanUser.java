@@ -14,18 +14,18 @@ import java.time.LocalDateTime;
 public class LeanUser {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "Id")
+    @Column(name = "id")
     private Long id;
 
     @ManyToOne
-    @JoinColumn(name = "UserId", referencedColumnName = "id", nullable = false)
+    @JoinColumn(name = "userid", referencedColumnName = "id", nullable = false)
     private User user;
-    @Column(name = "LeanUserId")
+    @Column(name = "leanuserid")
     private String leanUserId;
-    @Column(name = "LeanToken")
+    @Column(name = "leantoken")
     private String leanToken;
-    @Column(name = "CreatedAt")
+    @Column(name = "createdat")
     private LocalDateTime createdAt;
-    @Column(name = "UpdatedAt")
+    @Column(name = "updatedat")
     private LocalDateTime updatedAt;
 }

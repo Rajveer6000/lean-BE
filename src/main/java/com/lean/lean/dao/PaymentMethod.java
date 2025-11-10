@@ -14,26 +14,26 @@ import java.time.LocalDateTime;
 public class PaymentMethod {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "Id")
+    @Column(name = "id")
     private Long id;
 
     @ManyToOne
-    @JoinColumn(name = "LeanUserId", referencedColumnName = "id", nullable = false)
+    @JoinColumn(name = "leanuserid", referencedColumnName = "id", nullable = false)
     private LeanUser leanUser;
-    @Column(name = "CardNumber")
+    @Column(name = "cardnumber")
     private String cardNumber;
-    @Column(name = "CardHolderName")
+    @Column(name = "cardholdername")
     private String cardHolderName;
-    @Column(name = "ExpirationDate")
+    @Column(name = "expirationdate")
     private String expirationDate;
-    @Column(name = "Cvv")
+    @Column(name = "cvv")
     private String cvv;
-    @Column(name = "PaymentMethodType")
+    @Column(name = "paymentmethodtype")
     private PaymentMethodType paymentMethodType;
-    @Column(name = "IsPrimary")
+    @Column(name = "isprimary")
     private Boolean isPrimary;
-    @Column(name = "CreatedAt")
+    @Column(name = "createdat")
     private LocalDateTime createdAt;
-    @Column(name = "UpdatedAt")
+    @Column(name = "updatedat")
     private LocalDateTime updatedAt;
 }

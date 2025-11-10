@@ -1,8 +1,11 @@
 package com.lean.lean.dao;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 
@@ -23,9 +26,9 @@ public class LeanWebhookLog {
     @Column(name = "message")
     private String message;
 
-    @Convert(converter = JsonAttributeConverter.class)
-    @Column(name = "payload", columnDefinition = "JSON")
-    private Object payload;
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "payload", columnDefinition = "JSONB")
+    private JsonNode payload;
 
     @Column(name = "event_id")
     private String eventId;

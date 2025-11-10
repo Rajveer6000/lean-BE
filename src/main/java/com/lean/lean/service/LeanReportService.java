@@ -1,5 +1,8 @@
 package com.lean.lean.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import com.lean.lean.dao.ExpenseInsightReport;
 import com.lean.lean.dao.IncomeInsightReport;
 import com.lean.lean.dao.LeanTransactionReport;
@@ -17,8 +20,6 @@ import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
-import org.json.JSONArray;
-import org.json.JSONObject;
 import org.springframework.stereotype.Service;
 
 import java.io.FileOutputStream;
@@ -53,6 +54,11 @@ public class LeanReportService {
 
     private static final DateTimeFormatter FILE_TIMESTAMP = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss");
     private static final long REPORT_URL_EXPIRY_MINUTES = 10;
+    private static final int EXCEL_CELL_CHAR_LIMIT = 32767;
+    private static final int RAW_PAYLOAD_CHUNK_SIZE = 16000;
+    private static final int RAW_PAYLOAD_COLUMNS = 2;
+    private static final ObjectMapper JSON_MAPPER = new ObjectMapper()
+            .enable(SerializationFeature.INDENT_OUTPUT);
 
     private final S3Service s3Service;
     private final LeanTransactionReportRepository leanTransactionReportRepository;
@@ -782,30 +788,47 @@ public class LeanReportService {
     }
 
     private void addRawPayloadSheet(Workbook workbook, Object payload) {
+        String json = toJsonString(payload);
+        if (json == null || json.isEmpty()) {
+            return;
+        }
         Sheet sheet = workbook.createSheet("Raw Payload");
         CellStyle style = workbook.createCellStyle();
         style.setWrapText(true);
-        String json = toJsonString(payload);
-        Row row = sheet.createRow(0);
-        Cell cell = row.createCell(0);
-        cell.setCellValue(json);
-        cell.setCellStyle(style);
-        sheet.setColumnWidth(0, 120 * 256);
-        row.setHeightInPoints(Math.min(8192, json.length() / 2f)); // ensure visibility without thousands of rows
+
+        int pointer = 0;
+        int rowIndex = 0;
+        while (pointer < json.length()) {
+            Row row = sheet.createRow(rowIndex++);
+            int charsInRow = 0;
+            for (int col = 0; col < RAW_PAYLOAD_COLUMNS && pointer < json.length(); col++) {
+                int remaining = json.length() - pointer;
+                int chunk = Math.min(RAW_PAYLOAD_CHUNK_SIZE, remaining);
+                chunk = Math.min(chunk, EXCEL_CELL_CHAR_LIMIT);
+                String slice = json.substring(pointer, pointer + chunk);
+                pointer += chunk;
+                charsInRow += slice.length();
+
+                Cell cell = row.createCell(col);
+                cell.setCellValue(slice);
+                cell.setCellStyle(style);
+                sheet.setColumnWidth(col, 80 * 256);
+            }
+            float height = Math.min(8192f, Math.max(row.getHeightInPoints(), charsInRow / 80f * 15f));
+            row.setHeightInPoints(height);
+        }
     }
 
     private String toJsonString(Object payload) {
         if (payload == null) {
             return "{}";
         }
-        Object wrapped = JSONObject.wrap(payload);
-        if (wrapped instanceof JSONObject jsonObject) {
-            return jsonObject.toString(2);
+        try {
+            return JSON_MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(payload);
+        } catch (JsonProcessingException ex) {
+            log.warn("Failed to serialize raw payload, storing plain text copy", ex);
+            return String.valueOf(payload);
         }
-        if (wrapped instanceof JSONArray jsonArray) {
-            return jsonArray.toString(2);
-        }
-        return String.valueOf(payload);
     }
 
     private Map<String, Object> asMap(Object value) {

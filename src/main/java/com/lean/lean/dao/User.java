@@ -11,32 +11,32 @@ import java.time.LocalDateTime;
 @Entity
 @Data
 @NoArgsConstructor
-@Table(name = "user")
+@Table(name = "\"user\"")
 public class User {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "ID")
+    @Column(name = "id")
     private Long id;
 
-    @Column(name = "Email")
+    @Column(name = "email")
     private String email;
-    @Column(name = "Password")
+    @Column(name = "password")
     private String password;
-    @Column(name = "FirstName")
+    @Column(name = "firstname")
     private String firstName;
-    @Column(name = "LastName")
+    @Column(name = "lastname")
     private String lastName;
-    @Column(name = "DateOfBirth")
+    @Column(name = "dateofbirth")
     private Date dateOfBirth;
 
-    @Column(name = "Gender")
+    @Column(name = "gender")
     private String gender;
 
-    @Column(name = "Phone")
+    @Column(name = "phone")
     private String phone;
 
-    @Column(name = "CreatedAt")
+    @Column(name = "createdat")
     private LocalDateTime createdAt;
-    @Column(name = "UpdatedAt")
+    @Column(name = "updatedat")
     private LocalDateTime updatedAt;
 }

@@ -14,22 +14,22 @@ import java.time.LocalDateTime;
 public class LeanAccountBalance {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "Id")
+    @Column(name = "id")
     private Long id;
 
     @ManyToOne
-    @JoinColumn(name = "AccountId", referencedColumnName = "id", nullable = false)
+    @JoinColumn(name = "accountid", referencedColumnName = "id", nullable = false)
     private LeanAccount leanAccount;
 
     @Column(name = "balance")
     private Double balance;
-    @Column(name = "CurrencyCode")
+    @Column(name = "currencycode")
     private String currencyCode;
-    @Column(name = "AccountType")
+    @Column(name = "accounttype")
     private AccountType accountType;
 
-    @Column(name = "CreatedAt")
+    @Column(name = "createdat")
     private LocalDateTime createdAt;
-    @Column(name = "UpdatedAt")
+    @Column(name = "updatedat")
     private LocalDateTime updatedAt;
 }

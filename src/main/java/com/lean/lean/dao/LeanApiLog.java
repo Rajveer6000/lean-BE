@@ -17,20 +17,20 @@ import java.time.LocalDateTime;
 public class LeanApiLog {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "Id")
+    @Column(name = "id")
     private Long id;
 
-    @Column(name = "Endpoint")
+    @Column(name = "endpoint")
     private String endpoint;
-    @Column(name = "RequestBody")
+    @Column(name = "requestbody")
     private String requestBody;
-    @Column(name = "ResponseBody")
+    @Column(name = "responsebody")
     private String responseBody;
-    @Column(name = "StatusCode")
+    @Column(name = "statuscode")
     private int statusCode;
-    @Column(name = "ErrorMessage")
+    @Column(name = "errormessage")
     private String errorMessage;
 
-    @Column(name = "CreatedAt")
+    @Column(name = "createdat")
     private LocalDateTime createdAt;
 }

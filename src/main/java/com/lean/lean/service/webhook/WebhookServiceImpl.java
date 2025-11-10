@@ -47,7 +47,7 @@ public class WebhookServiceImpl implements WebhookService {
     public LeanWebhookLog processWebhook(WebHookRequestDto webhookPayloadDto) {
         LeanWebhookLog logRow = new LeanWebhookLog();
         logRow.setTimestamp(webhookPayloadDto.getTimestamp());
-        logRow.setPayload(webhookPayloadDto.getPayload());
+        logRow.setPayload(objectMapper.valueToTree(webhookPayloadDto.getPayload()));
         logRow.setType(webhookPayloadDto.getType());
         logRow.setEventId(webhookPayloadDto.getEvent_id());
         logRow.setMessage(webhookPayloadDto.getMessage());
@@ -530,7 +530,7 @@ public class WebhookServiceImpl implements WebhookService {
         entity.setUserId(dto.getAppUserId());
         entity.setBankId(bank.getId());
         try {
-            entity.setPermissions(objectMapper.writeValueAsString(dto.getPermissions()));
+            entity.setPermissions(objectMapper.valueToTree(dto.getPermissions()));
         } catch (Exception e) {
             entity.setPermissions(null);
         }

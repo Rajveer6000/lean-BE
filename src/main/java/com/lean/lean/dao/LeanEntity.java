@@ -1,12 +1,14 @@
 package com.lean.lean.dao;
 
 
+import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
-import java.time.Instant;
 import java.time.LocalDateTime;
 
 @Data
@@ -26,8 +28,9 @@ public class LeanEntity {
     @Column(name = "user_id")
     private String userId;
 
-    @Column(name = "permissions", columnDefinition = "json")
-    private String permissions;
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "permissions", columnDefinition = "JSONB")
+    private JsonNode permissions;
 
     @Column(name = "bank_id")
     private Long bankId;

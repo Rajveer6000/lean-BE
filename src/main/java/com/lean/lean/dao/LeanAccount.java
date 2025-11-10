@@ -15,36 +15,36 @@ import java.time.LocalDateTime;
 public class LeanAccount {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "Id")
+    @Column(name = "id")
     private Long id;
 
     @ManyToOne
-    @JoinColumn(name = "LeanUserId", referencedColumnName = "id", nullable = false)
+    @JoinColumn(name = "leanuserid", referencedColumnName = "id", nullable = false)
     private LeanUser leanUser;
 
-    @Column(name = "AccountName")
+    @Column(name = "accountname")
     private String accountName;
-    @Column(name = "CurrencyCode")
+    @Column(name = "currencycode")
     private String currencyCode;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "AccountType")
+    @Column(name = "accounttype")
     private AccountType accountType;
 
-    @Column(name = "Iban")
+    @Column(name = "iban")
     private String iban;
-    @Column(name = "AccountNumber")
+    @Column(name = "accountnumber")
     private String accountNumber;
-    @Column(name = "CreditLimit")
+    @Column(name = "creditlimit")
     private Double creditLimit;
-    @Column(name = "NextPaymentDueDate")
+    @Column(name = "nextpaymentduedate")
     private Date nextPaymentDueDate;
-    @Column(name = "NextPaymentDueAmount")
+    @Column(name = "nextpaymentdueamount")
     private Double nextPaymentDueAmount;
 
-    @Column(name = "CreatedAt")
+    @Column(name = "createdat")
     private LocalDateTime createdAt;
-    @Column(name = "UpdatedAt")
+    @Column(name = "updatedat")
     private LocalDateTime updatedAt;
 
 
