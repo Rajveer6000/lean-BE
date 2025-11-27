@@ -133,13 +133,13 @@ public class UserLeanService {
                 normalizedIncomeType,
                 accessToken
         );
-        ReportLink reportLink = leanReportService.captureIncomeReport(
-                userId,
-                startDate,
-                normalizedIncomeType,
-                response
-        );
-        return attachReportLink(response, reportLink);
+//        ReportLink reportLink = leanReportService.captureIncomeReport(
+//                userId,
+//                startDate,
+//                normalizedIncomeType,
+//                response
+//        );
+        return attachReportLink(response, null);
     }
 
     public Object getExpensesDetails(Long userId, LocalDate startDate) {
@@ -163,8 +163,8 @@ public class UserLeanService {
                 startDate,
                 accessToken
         );
-        ReportLink reportLink = leanReportService.captureExpenseReport(userId, startDate, response);
-        return attachReportLink(response, reportLink);
+//        ReportLink reportLink = leanReportService.captureExpenseReport(userId, startDate, response);
+        return attachReportLink(response, null);
     }
 
     public Object getNameVerification(Long userId, String fullName) {

@@ -2,6 +2,7 @@ package com.lean.lean.service.user;
 
 import com.lean.lean.dao.User;
 import com.lean.lean.dto.AddUserDTO;
+import com.lean.lean.dto.RentSavvyScoreDTO;
 import com.lean.lean.dto.UserDTO;
 
 import java.util.List;
@@ -12,4 +13,5 @@ public interface UserService {
     List<UserDTO> getAllUsers();
 
     User getUserById(Long id);
+    RentSavvyScoreDTO calculateScore(Long userId,Integer historyMonths);
 }

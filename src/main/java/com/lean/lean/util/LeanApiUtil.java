@@ -183,10 +183,10 @@ public class LeanApiUtil {
                 .put("insights", true);
 
         if (fromDate != null) {
-            body.put("from_date", fromDate.toString());
+            body.put("start_date", fromDate.toString());
         }
         if (toDate != null) {
-            body.put("to_date", toDate.toString());
+            body.put("end_date", toDate.toString());
         }
 
         ResponseEntity<String> resp =

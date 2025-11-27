@@ -2,6 +2,7 @@ package com.lean.lean.controller;
 
 import com.lean.lean.dao.User;
 import com.lean.lean.dto.AddUserDTO;
+import com.lean.lean.dto.RentSavvyScoreDTO;
 import com.lean.lean.dto.UserDTO;
 import com.lean.lean.service.user.UserService;
 import lombok.extern.slf4j.Slf4j;
@@ -31,5 +32,16 @@ public class UserController {
     @GetMapping("/{id}")
     public User getUserById(@PathVariable Long id) {
         return userService.getUserById(id);
+    }
+
+    @GetMapping("/rent-savvy-score/{id}")
+    public RentSavvyScoreDTO calculateScore(
+            @PathVariable Long id,
+            @RequestParam(required = false, defaultValue = "3") Integer historyMonths) {
+        if (historyMonths < 3) {
+            throw new IllegalArgumentException("Minimum 3 months of history required for Rent-Savvy scoring.");
+        }
+
+        return userService.calculateScore(id, historyMonths);
     }
 }
