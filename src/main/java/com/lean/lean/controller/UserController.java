@@ -33,15 +33,4 @@ public class UserController {
     public User getUserById(@PathVariable Long id) {
         return userService.getUserById(id);
     }
-
-    @GetMapping("/rent-savvy-score/{id}")
-    public RentSavvyScoreDTO calculateScore(
-            @PathVariable Long id,
-            @RequestParam(required = false, defaultValue = "3") Integer historyMonths) {
-        if (historyMonths < 3) {
-            throw new IllegalArgumentException("Minimum 3 months of history required for Rent-Savvy scoring.");
-        }
-
-        return userService.calculateScore(id, historyMonths);
-    }
 }

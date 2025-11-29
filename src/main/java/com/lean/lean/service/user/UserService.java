@@ -13,5 +13,4 @@ public interface UserService {
     List<UserDTO> getAllUsers();
 
     User getUserById(Long id);
-    RentSavvyScoreDTO calculateScore(Long userId,Integer historyMonths);
 }
