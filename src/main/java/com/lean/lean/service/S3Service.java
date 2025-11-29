@@ -1,20 +1,18 @@
 package com.lean.lean.service;
 
-import com.amazonaws.HttpMethod;
-import com.amazonaws.SdkClientException;
-import com.amazonaws.services.s3.AmazonS3;
-import com.amazonaws.services.s3.model.GeneratePresignedUrlRequest;
-import com.amazonaws.services.s3.model.GetObjectRequest;
-import com.amazonaws.services.s3.model.ObjectMetadata;
-import com.amazonaws.services.s3.model.PutObjectRequest;
-import com.amazonaws.services.s3.model.PutObjectResult;
-import com.amazonaws.services.s3.model.S3Object;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+import software.amazon.awssdk.core.ResponseInputStream;
+import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.*;
+import software.amazon.awssdk.services.s3.presigner.S3Presigner;
+import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
+import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequest;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -23,7 +21,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.security.SecureRandom;
-import java.util.Date;
+import java.time.Duration;
 
 @Service
 public class S3Service {
@@ -34,13 +32,15 @@ public class S3Service {
     @SuppressWarnings("unused")
     private static final int NUM_STRINGS_TO_GENERATE = 1_000_000;
 
-    private final AmazonS3 amazonS3;
+    private final S3Client s3Client;
+    private final S3Presigner s3Presigner;
 
     @Value("${aws.s3.bucketName}")
     private String bucketName;
 
-    public S3Service(AmazonS3 amazonS3) {
-        this.amazonS3 = amazonS3;
+    public S3Service(S3Client s3Client, S3Presigner s3Presigner) {
+        this.s3Client = s3Client;
+        this.s3Presigner = s3Presigner;
     }
 
     public static String generateRandomString() {
@@ -61,11 +61,17 @@ public class S3Service {
             } else {
                 path = name;
             }
-            ObjectMetadata objectMetadata = new ObjectMetadata();
-            objectMetadata.setContentLength(file.length());
-            PutObjectRequest putObjectRequest = new PutObjectRequest(bucketName, path, input, objectMetadata);
-            PutObjectResult putObjectResult = amazonS3.putObject(putObjectRequest);
-            if (putObjectResult != null) {
+
+            PutObjectRequest putObjectRequest = PutObjectRequest.builder()
+                    .bucket(bucketName)
+                    .key(path)
+                    .contentLength(file.length())
+                    .build();
+
+            PutObjectResponse putObjectResponse = s3Client.putObject(putObjectRequest,
+                    RequestBody.fromInputStream(input, file.length()));
+
+            if (putObjectResponse != null) {
                 return path;
             }
         } catch (Exception e) {
@@ -74,25 +80,36 @@ public class S3Service {
         return null;
     }
 
-    public URL generateSignedUrl(String objectKey, Date expiration, String customBucket) {
+    public URL generateSignedUrl(String objectKey, Duration expiration, String customBucket) {
         try {
-            GeneratePresignedUrlRequest generatePresignedUrlRequest =
-                    new GeneratePresignedUrlRequest(customBucket, objectKey)
-                            .withMethod(HttpMethod.GET)
-                            .withExpiration(expiration);
+            GetObjectRequest getObjectRequest = GetObjectRequest.builder()
+                    .bucket(customBucket)
+                    .key(objectKey)
+                    .build();
 
-            return amazonS3.generatePresignedUrl(generatePresignedUrlRequest);
-        } catch (SdkClientException e) {
+            GetObjectPresignRequest presignRequest = GetObjectPresignRequest.builder()
+                    .signatureDuration(expiration)
+                    .getObjectRequest(getObjectRequest)
+                    .build();
+
+            PresignedGetObjectRequest presignedRequest = s3Presigner.presignGetObject(presignRequest);
+            return presignedRequest.url();
+        } catch (S3Exception e) {
             LOGGER.error("Failed to generate signed URL for key {} in bucket {}", objectKey, customBucket, e);
             return null;
         }
     }
 
-    public S3Object fetchS3Object(String objectKey, String customBucket) {
+    public ResponseInputStream<GetObjectResponse> fetchS3Object(String objectKey, String customBucket) {
         LOGGER.info("Fetching object {} from bucket {}", objectKey, customBucket);
         try {
-            return amazonS3.getObject(new GetObjectRequest(customBucket, objectKey));
-        } catch (SdkClientException e) {
+            GetObjectRequest getObjectRequest = GetObjectRequest.builder()
+                    .bucket(customBucket)
+                    .key(objectKey)
+                    .build();
+
+            return s3Client.getObject(getObjectRequest);
+        } catch (S3Exception e) {
             LOGGER.error("Failed to fetch object {} from bucket {}", objectKey, customBucket, e);
             return null;
         }
@@ -107,20 +124,17 @@ public class S3Service {
         if (StringUtils.isBlank(objectKey)) {
             return null;
         }
-        long expiryMillis = Math.max(expiryMinutes, 1) * 60_000L;
-        Date expiration = new Date(System.currentTimeMillis() + expiryMillis);
+        Duration expiration = Duration.ofMinutes(Math.max(expiryMinutes, 1));
         URL url = generateSignedUrl(objectKey, expiration, bucketName);
         return url != null ? url.toString() : null;
     }
 
     public byte[] downloadObjectAsByteArray(String customBucket, String key) throws IOException {
-        Date expiration = new Date();
-        long expTimeMillis = expiration.getTime();
-        expTimeMillis += 1000 * 60 * 5;
-        expiration.setTime(expTimeMillis);
-        URL signedUrl = amazonS3.generatePresignedUrl(customBucket, key, expiration, HttpMethod.GET);
+        Duration expiration = Duration.ofMinutes(5);
+        URL signedUrl = generateSignedUrl(key, expiration, customBucket);
+
         try (InputStream inputStream = signedUrl.openStream();
-             ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
+                ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
 
             byte[] buffer = new byte[4096];
             int bytesRead;

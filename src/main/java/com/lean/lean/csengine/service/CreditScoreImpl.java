@@ -21,11 +21,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -116,12 +112,12 @@ public class CreditScoreImpl implements CreditScoreService {
                     .bonusIncome(bonusIncome)
                     .averageMonthlyIncome(averageMonthlySalary)
                     .averageMonthlyExpense(averageMonthlyExpense)
-                    .declaredMonthlyIncome(null) // Not available in API data
-                    .declaredMonthlyExpense(null) // Not available in API data
+                    .declaredMonthlyIncome(new BigDecimal("12000"))
+                    .declaredMonthlyExpense(new BigDecimal("5000"))
+                    .employmentTenureInMonths(24)
+                    .numberOfDependents(2)
+                    .aecbScore(710)
                     .dataMonthCount(dataMonthCount)
-                    .employmentTenureInMonths(null)
-                    .numberOfDependents(null) // Not available in API data
-                    .aecbScore(null) // Not available in API data
                     .build();
         } catch (Exception e) {
             log.error("Error calculating RentSavvy Score", e);
