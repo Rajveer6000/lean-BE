@@ -18,6 +18,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * Service for calculating credit scores based on configuration and input data
@@ -59,37 +60,44 @@ public class CreditScoreCalculationService {
             saveMetaInformation(master, inputDTO);
             logCalculationStep(master.getId(), "Meta information saved", "All input data persisted");
 
-            // 5. Calculate category scores
+            // 5. Calculate category type scores
             List<CategoryCalculationResult> categoryResults = calculateCategoryScores(master.getId(), inputDTO, config);
-            BigDecimal totalCategoryScore = saveCategoryCalculations(master.getId(), categoryResults);
-            logCalculationStep(master.getId(), "Category scores calculated",
+            logCalculationStep(master.getId(), "Category type scores calculated",
+                    "Total category types: " + categoryResults.size());
+
+            // 6. Calculate main category scores by aggregating category type scores
+            List<MainCategoryCalculationResult> mainCategoryResults = calculateMainCategoryScores(categoryResults,
+                    config);
+            BigDecimal totalCategoryScore = saveMainCategoryCalculations(master.getId(), mainCategoryResults);
+            logCalculationStep(master.getId(), "Main category scores calculated",
                     "Total category score: " + totalCategoryScore);
 
-            // 6. Apply adjustment rules
+            // 7. Apply adjustment rules
             List<AdjustmentRuleResult> adjustmentResults = applyAdjustmentRules(master.getId(), inputDTO, config);
             BigDecimal totalAdjustments = saveAdjustmentRuleCalculations(master.getId(), adjustmentResults);
             logCalculationStep(master.getId(), "Adjustment rules applied",
                     "Total adjustments: " + totalAdjustments);
 
-            // 7. Calculate final score
+            // 8. Calculate final score
             BigDecimal finalScore = calculateFinalScore(totalCategoryScore, totalAdjustments, config);
             finalScore = CalculationUtils.capScore(finalScore, config.getEngineConfig().getScoreCap());
 
-            // 8. Determine risk tier
+            // 9. Determine risk tier
             String riskTier = determineRiskTier(finalScore, config);
 
-            // 9. Update master with final score and complete status
+            // 10. Update master with final score and complete status
             completeMasterRecord(master, finalScore, riskTier);
             logCalculationStep(master.getId(), "Calculation completed",
                     "Final score: " + finalScore + ", Risk Tier: " + riskTier);
 
-            // 10. Build response
+            // 11. Build response
             Map<String, Object> response = new HashMap<>();
             response.put("calculationId", master.getId());
             response.put("userId", userId);
             response.put("finalScore", finalScore);
             response.put("riskTier", riskTier);
             response.put("categoryScores", categoryResults);
+            response.put("mainCategoryScores", mainCategoryResults);
             response.put("adjustments", adjustmentResults);
 
             log.info("Credit score calculation completed successfully for user: {}", userId);
@@ -227,8 +235,6 @@ public class CreditScoreCalculationService {
         String details = "";
 
         switch (categoryTypeName) {
-
-
             case "Salary":
                 if (inputDTO.getSalaried() != null) {
                     rawValue = CalculationUtils.calculateVariance(inputDTO.getSalaried().getMonthlyIncome());
@@ -344,6 +350,122 @@ public class CreditScoreCalculationService {
         }
 
         return total.setScale(2, RoundingMode.HALF_UP);
+    }
+
+    /**
+     * Calculate main category scores by aggregating category type scores
+     * Formula: Main Category Score = (Sum of Category Type Weighted Scores) * (Main
+     * Category Weightage / 100)
+     */
+    private List<MainCategoryCalculationResult> calculateMainCategoryScores(
+            List<CategoryCalculationResult> categoryResults,
+            CreditScoreConfigDTO config) {
+
+        List<MainCategoryCalculationResult> mainCategoryResults = new ArrayList<>();
+
+        // Group category results by main category
+        Map<Long, List<CategoryCalculationResult>> groupedByMainCategory = categoryResults.stream()
+                .collect(Collectors.groupingBy(CategoryCalculationResult::getMainCategoryId));
+
+        // Calculate score for each main category
+        for (Map.Entry<Long, List<CategoryCalculationResult>> entry : groupedByMainCategory.entrySet()) {
+            Long mainCategoryId = entry.getKey();
+            List<CategoryCalculationResult> categoryTypesInMainCategory = entry.getValue();
+
+            // Get main category info from config
+            CreditScoreConfigDTO.MainCategoryInfo mainCategoryInfo = config.getMainCategories().stream()
+                    .filter(mc -> mc.getId().equals(mainCategoryId))
+                    .findFirst()
+                    .orElseThrow(() -> new RuntimeException("Main category not found with id: " + mainCategoryId));
+
+            // Sum all category type weighted scores within this main category
+            BigDecimal sumOfCategoryTypeWeightedScores = categoryTypesInMainCategory.stream()
+                    .map(CategoryCalculationResult::getWeightedScore)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            // Apply main category weightage: (sum of category type weighted scores) * (main
+            // category weightage / 100)
+            BigDecimal finalMainCategoryScore = sumOfCategoryTypeWeightedScores
+                    .multiply(mainCategoryInfo.getWeightage())
+                    .divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP);
+
+            // Build calculation details
+            StringBuilder details = new StringBuilder();
+            details.append("Category Types: ");
+            for (CategoryCalculationResult cat : categoryTypesInMainCategory) {
+                details.append(cat.getCategoryTypeName())
+                        .append(" (weighted: ").append(cat.getWeightedScore()).append("), ");
+            }
+            details.append("Sum: ").append(sumOfCategoryTypeWeightedScores)
+                    .append(", Main Weightage: ").append(mainCategoryInfo.getWeightage()).append("%")
+                    .append(", Final: ").append(finalMainCategoryScore);
+
+            MainCategoryCalculationResult mainCategoryResult = MainCategoryCalculationResult.builder()
+                    .mainCategoryId(mainCategoryId)
+                    .mainCategoryName(mainCategoryInfo.getName())
+                    .mainCategoryWeightage(mainCategoryInfo.getWeightage())
+                    .sumOfCategoryTypeWeightedScores(sumOfCategoryTypeWeightedScores)
+                    .finalMainCategoryScore(finalMainCategoryScore.setScale(4, RoundingMode.HALF_UP))
+                    .categoryTypeResults(categoryTypesInMainCategory)
+                    .calculationDetails(details.toString())
+                    .build();
+
+            mainCategoryResults.add(mainCategoryResult);
+
+            log.info("Main Category: {}, Sum of Category Types: {}, Weightage: {}%, Final Score: {}",
+                    mainCategoryInfo.getName(), sumOfCategoryTypeWeightedScores,
+                    mainCategoryInfo.getWeightage(), finalMainCategoryScore);
+        }
+
+        return mainCategoryResults;
+    }
+
+    /**
+     * Save main category calculations and return total score
+     */
+    private BigDecimal saveMainCategoryCalculations(Long masterId,
+            List<MainCategoryCalculationResult> mainCategoryResults) {
+        BigDecimal totalScore = BigDecimal.ZERO;
+
+        for (MainCategoryCalculationResult mainCatResult : mainCategoryResults) {
+            // Save each category type calculation within the main category
+            for (CategoryCalculationResult categoryTypeResult : mainCatResult.getCategoryTypeResults()) {
+                CategoryCalculations calc = new CategoryCalculations();
+                calc.setUserCalculationMaster(creditScoreUserCalculationMasterRepository.getById(masterId));
+
+                // Set the main category using the mainCategoryId from result
+                ScoringMainCategory mainCategory = scoringMainCategoryRepository
+                        .findById(mainCatResult.getMainCategoryId())
+                        .orElseThrow(() -> new RuntimeException(
+                                "Main category not found with id: " + mainCatResult.getMainCategoryId()));
+                calc.setMainCategory(mainCategory);
+
+                // Store calculation details as inputValues (JSON)
+                Map<String, Object> inputData = new HashMap<>();
+                inputData.put("rawValue", categoryTypeResult.getRawValue());
+                inputData.put("rawScore", categoryTypeResult.getRawScore());
+                inputData.put("categoryTypeWeightedScore", categoryTypeResult.getWeightedScore());
+                inputData.put("categoryTypeWeightage", categoryTypeResult.getWeightage());
+                inputData.put("categoryTypeName", categoryTypeResult.getCategoryTypeName());
+                inputData.put("calculationDetails", categoryTypeResult.getCalculationDetails());
+                inputData.put("mainCategoryWeightage", mainCatResult.getMainCategoryWeightage());
+                inputData.put("sumOfCategoryTypeWeightedScores", mainCatResult.getSumOfCategoryTypeWeightedScores());
+                inputData.put("finalMainCategoryScore", mainCatResult.getFinalMainCategoryScore());
+                calc.setInputValues(inputData);
+
+                // Set the final main category score (all records in the same main category will
+                // have the same score)
+                calc.setScore(mainCatResult.getFinalMainCategoryScore());
+                calc.setCreatedAt(LocalDateTime.now());
+
+                categoryCalculationsRepository.save(calc);
+            }
+
+            // Add this main category's final score to the total
+            totalScore = totalScore.add(mainCatResult.getFinalMainCategoryScore());
+        }
+
+        return totalScore.setScale(2, RoundingMode.HALF_UP);
     }
 
     private List<AdjustmentRuleResult> applyAdjustmentRules(Long masterId,
