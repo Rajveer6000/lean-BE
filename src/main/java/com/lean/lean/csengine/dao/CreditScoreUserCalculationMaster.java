@@ -18,6 +18,7 @@ import java.time.LocalDateTime;
 public class CreditScoreUserCalculationMaster {
 
     @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "Id")
     private Long id;
 
@@ -45,11 +46,11 @@ public class CreditScoreUserCalculationMaster {
     private BigDecimal finalScoreCapped;
 
     @ManyToOne
-    @JoinColumn(name = "TierId", referencedColumnName = "Id", nullable = false)
+    @JoinColumn(name = "TierId", referencedColumnName = "Id")
     private RiskTierConfig tier;
 
     @Column(name = "RiskTier")
-    private Integer riskTier;
+    private String riskTier;
 
     @Column(name = "RiskLevel", length = 50)
     private String riskLevel;

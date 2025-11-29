@@ -16,6 +16,7 @@ import java.time.LocalDateTime;
 public class CategoryCalculations {
 
     @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "Id")
     private Long id;
 

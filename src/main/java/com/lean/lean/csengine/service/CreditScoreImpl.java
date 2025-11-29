@@ -51,6 +51,9 @@ public class CreditScoreImpl implements CreditScoreService {
     @Autowired
     private CreditScoreConfigService creditScoreConfigService;
 
+    @Autowired
+    private CreditScoreCalculationService creditScoreCalculationService;
+
     private final ObjectMapper objectMapper;
 
     private final ExecutorService apiExecutor = Executors.newFixedThreadPool(10);
@@ -141,10 +144,15 @@ public class CreditScoreImpl implements CreditScoreService {
             // Fetch credit score configuration (using default engine config ID = 1)
             CreditScoreConfigDTO configDTO = creditScoreConfigService.getEngineConfiguration(1L);
 
-            // Build response with both inputDTO and config
+            // Calculate credit score using the calculation engine
+            Map<String, Object> calculationResult = creditScoreCalculationService.calculateCreditScore(
+                    userId, inputDTO, 1L);
+
+            // Build response with inputDTO, config, and calculation results
             Map<String, Object> response = new HashMap<>();
-            response.put("inputDTO", inputDTO);
-            response.put("config", configDTO);
+             response.put("inputDTO", inputDTO);
+             response.put("calculation", calculationResult);
+            response.put("configDTO", configDTO);
 
             return response;
         } catch (Exception e) {

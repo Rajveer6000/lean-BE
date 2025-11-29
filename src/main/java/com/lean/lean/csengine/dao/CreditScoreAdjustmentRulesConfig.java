@@ -13,6 +13,7 @@ import java.math.BigDecimal;
 public class CreditScoreAdjustmentRulesConfig {
 
     @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "Id")
     private Long id;
 

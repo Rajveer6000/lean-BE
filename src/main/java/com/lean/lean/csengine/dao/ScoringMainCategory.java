@@ -15,6 +15,7 @@ import java.time.LocalDateTime;
 public class ScoringMainCategory {
 
     @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "Id")
     private Long id;
 
