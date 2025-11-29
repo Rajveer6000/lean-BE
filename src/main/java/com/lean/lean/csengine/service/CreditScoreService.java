@@ -1,7 +1,7 @@
 package com.lean.lean.csengine.service;
 
-import com.lean.lean.csengine.dto.RentSavvyScoreInputDTO;
+import java.util.Map;
 
-public interface CreditScoreService  {
-    RentSavvyScoreInputDTO calculateScore(Long userId, Integer historyMonths);
+public interface CreditScoreService {
+    Map<String, Object> calculateScore(Long userId, Integer historyMonths);
 }

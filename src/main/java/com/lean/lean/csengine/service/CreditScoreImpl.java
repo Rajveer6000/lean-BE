@@ -3,6 +3,8 @@ package com.lean.lean.csengine.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lean.lean.csengine.dto.BonusIncomeDTO;
+import com.lean.lean.csengine.enums.DataSource;
+import com.lean.lean.csengine.dto.CreditScoreConfigDTO;
 import com.lean.lean.csengine.dto.IncomeStreamDTO;
 import com.lean.lean.csengine.dto.RentSavvyScoreInputDTO;
 import com.lean.lean.dao.LeanEntity;
@@ -21,7 +23,9 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -44,12 +48,15 @@ public class CreditScoreImpl implements CreditScoreService {
     @Autowired
     private LeanReportService leanReportService;
 
+    @Autowired
+    private CreditScoreConfigService creditScoreConfigService;
+
     private final ObjectMapper objectMapper;
 
     private final ExecutorService apiExecutor = Executors.newFixedThreadPool(10);
 
     @Override
-    public RentSavvyScoreInputDTO calculateScore(Long userId, Integer historyMonths) {
+    public Map<String, Object> calculateScore(Long userId, Integer historyMonths) {
         try {
             User user = userRepository.findById(userId)
                     .orElseThrow(() -> new RuntimeException("User not found"));
@@ -103,22 +110,43 @@ public class CreditScoreImpl implements CreditScoreService {
                         .build();
             }
 
-            // Build and return the complete DTO
-            return RentSavvyScoreInputDTO.builder()
+            // Build and return the complete DTO with data sources
+            RentSavvyScoreInputDTO inputDTO = RentSavvyScoreInputDTO.builder()
                     .userId(userId)
                     .historyMonths(historyMonths)
                     .salaried(salariedIncome)
+                    .salariedDataSource(DataSource.LEAN_INCOME_API)
                     .nonSalaried(nonSalariedIncome)
+                    .nonSalariedDataSource(nonSalariedIncome != null ? DataSource.LEAN_INCOME_API : null)
                     .bonusIncome(bonusIncome)
+                    .bonusIncomeSource(bonusIncome != null ? DataSource.LEAN_INCOME_API : null)
                     .averageMonthlyIncome(averageMonthlySalary)
+                    .averageMonthlyIncomeSource(DataSource.CALCULATED)
                     .averageMonthlyExpense(averageMonthlyExpense)
+                    .averageMonthlyExpenseSource(DataSource.CALCULATED)
                     .declaredMonthlyIncome(new BigDecimal("12000"))
+                    .declaredMonthlyIncomeSource(DataSource.DEFAULT)
                     .declaredMonthlyExpense(new BigDecimal("5000"))
+                    .declaredMonthlyExpenseSource(DataSource.DEFAULT)
                     .employmentTenureInMonths(24)
+                    .employmentTenureSource(DataSource.DEFAULT)
                     .numberOfDependents(2)
+                    .numberOfDependentsSource(DataSource.DEFAULT)
                     .aecbScore(710)
+                    .aecbScoreSource(DataSource.AECB)
                     .dataMonthCount(dataMonthCount)
+                    .dataMonthCountSource(DataSource.CALCULATED)
                     .build();
+
+            // Fetch credit score configuration (using default engine config ID = 1)
+            CreditScoreConfigDTO configDTO = creditScoreConfigService.getEngineConfiguration(1L);
+
+            // Build response with both inputDTO and config
+            Map<String, Object> response = new HashMap<>();
+            response.put("inputDTO", inputDTO);
+            response.put("config", configDTO);
+
+            return response;
         } catch (Exception e) {
             log.error("Error calculating RentSavvy Score", e);
             throw new RuntimeException("Error calculating score: " + e.getMessage());
