@@ -137,28 +137,31 @@ public class CreditScoreCalculationService {
 
         // Save salary income (monthly)
         if (inputDTO.getSalaried() != null && inputDTO.getSalaried().getMonthlyIncome() != null) {
-            List<BigDecimal> salaries = inputDTO.getSalaried().getMonthlyIncome();
+            List<MonthlyDataDTO> salaries = inputDTO.getSalaried().getMonthlyIncome();
             for (int i = 0; i < salaries.size(); i++) {
+                MonthlyDataDTO data = salaries.get(i);
                 metaList.add(createMetaInfo(master, "salary_income_m" + (i + 1),
-                        salaries.get(i).toString(), inputDTO.getSalariedDataSource()));
+                        data.getAmount().toString(), inputDTO.getSalariedDataSource()));
             }
         }
 
         // Save non-salary income (monthly)
         if (inputDTO.getNonSalaried() != null && inputDTO.getNonSalaried().getMonthlyIncome() != null) {
-            List<BigDecimal> nonSalaries = inputDTO.getNonSalaried().getMonthlyIncome();
+            List<MonthlyDataDTO> nonSalaries = inputDTO.getNonSalaried().getMonthlyIncome();
             for (int i = 0; i < nonSalaries.size(); i++) {
+                MonthlyDataDTO data = nonSalaries.get(i);
                 metaList.add(createMetaInfo(master, "non_salary_income_m" + (i + 1),
-                        nonSalaries.get(i).toString(), inputDTO.getNonSalariedDataSource()));
+                        data.getAmount().toString(), inputDTO.getNonSalariedDataSource()));
             }
         }
 
         // Save expenses (monthly)
         if (inputDTO.getSalaried() != null && inputDTO.getSalaried().getMonthlyExpense() != null) {
-            List<BigDecimal> expenses = inputDTO.getSalaried().getMonthlyExpense();
+            List<MonthlyDataDTO> expenses = inputDTO.getSalaried().getMonthlyExpense();
             for (int i = 0; i < expenses.size(); i++) {
+                MonthlyDataDTO data = expenses.get(i);
                 metaList.add(createMetaInfo(master, "expense_m" + (i + 1),
-                        expenses.get(i).toString(), inputDTO.getSalariedDataSource()));
+                        data.getAmount().toString(), inputDTO.getSalariedDataSource()));
             }
         }
 
@@ -237,7 +240,8 @@ public class CreditScoreCalculationService {
         switch (categoryTypeName) {
             case "Salary":
                 if (inputDTO.getSalaried() != null) {
-                    rawValue = CalculationUtils.calculateVariance(inputDTO.getSalaried().getMonthlyIncome());
+                    List<BigDecimal> amounts = extractAmounts(inputDTO.getSalaried().getMonthlyIncome());
+                    rawValue = CalculationUtils.calculateVariance(amounts);
                     rawScore = CalculationUtils.findThresholdScore(rawValue, categoryConfig.getThresholds());
                     details = "Salary variance: " + rawValue + "%";
                 }
@@ -270,7 +274,8 @@ public class CreditScoreCalculationService {
 
             case "ExpenseVariance":
                 if (inputDTO.getSalaried() != null) {
-                    rawValue = CalculationUtils.calculateVariance(inputDTO.getSalaried().getMonthlyExpense());
+                    List<BigDecimal> amounts = extractAmounts(inputDTO.getSalaried().getMonthlyExpense());
+                    rawValue = CalculationUtils.calculateVariance(amounts);
                     rawScore = CalculationUtils.findThresholdScore(rawValue, categoryConfig.getThresholds());
                     details = "Expense variance: " + rawValue + "%";
                 }
@@ -528,8 +533,8 @@ public class CreditScoreCalculationService {
 
             case "HighExpenseVariancePenalty":
                 if (inputDTO.getSalaried() != null) {
-                    BigDecimal variance = CalculationUtils
-                            .calculateVariance(inputDTO.getSalaried().getMonthlyExpense());
+                    List<BigDecimal> amounts = extractAmounts(inputDTO.getSalaried().getMonthlyExpense());
+                    BigDecimal variance = CalculationUtils.calculateVariance(amounts);
                     if (variance.compareTo(BigDecimal.valueOf(40)) >= 0) {
                         applied = true;
                         reason = "High expense variance: " + variance + "%";
@@ -618,5 +623,17 @@ public class CreditScoreCalculationService {
         log.setLogMessage(details);
         log.setCreatedAt(LocalDateTime.now());
         logsRepository.save(log);
+    }
+
+    /**
+     * Extract amounts from List of MonthlyDataDTO
+     */
+    private List<BigDecimal> extractAmounts(List<MonthlyDataDTO> monthlyDataList) {
+        if (monthlyDataList == null) {
+            return new ArrayList<>();
+        }
+        return monthlyDataList.stream()
+                .map(MonthlyDataDTO::getAmount)
+                .collect(Collectors.toList());
     }
 }

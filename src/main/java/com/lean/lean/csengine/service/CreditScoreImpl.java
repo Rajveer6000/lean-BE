@@ -6,6 +6,7 @@ import com.lean.lean.csengine.dto.BonusIncomeDTO;
 import com.lean.lean.csengine.enums.DataSource;
 import com.lean.lean.csengine.dto.CreditScoreConfigDTO;
 import com.lean.lean.csengine.dto.IncomeStreamDTO;
+import com.lean.lean.csengine.dto.MonthlyDataDTO;
 import com.lean.lean.csengine.dto.RentSavvyScoreInputDTO;
 import com.lean.lean.dao.LeanEntity;
 import com.lean.lean.dao.User;
@@ -87,15 +88,16 @@ public class CreditScoreImpl implements CreditScoreService {
 
             // Extract data using helper methods
             Integer dataMonthCount = calculateDataMonthCount(incomeNode, expenseNode);
-            List<BigDecimal> monthlySalaryData = extractMonthlySalaryData(incomeNode, historyMonths);
-            List<BigDecimal> monthlyNonSalaryData = extractMonthlyNonSalaryData(incomeNode, historyMonths);
-            List<BigDecimal> monthlyExpenseData = extractMonthlyExpenseData(expenseNode, historyMonths);
+            List<MonthlyDataDTO> monthlySalaryData = extractMonthlySalaryData(incomeNode, historyMonths);
+            List<MonthlyDataDTO> monthlyNonSalaryData = extractMonthlyNonSalaryData(incomeNode, historyMonths);
+            List<MonthlyDataDTO> monthlyExpenseData = extractMonthlyExpenseData(expenseNode, historyMonths);
             BonusIncomeDTO bonusIncome = extractBonusIncome(incomeNode);
 
             // Calculate average monthly income from complete months
             BigDecimal averageMonthlySalary = calculateAverageSalary(incomeNode);
             BigDecimal averageMonthlyExpense = extractAverageMonthlyExpense(expenseNode);
-
+            log.info("Average Monthly Salary: {}", averageMonthlySalary);
+            log.info("Average Monthly Expense: {}", averageMonthlyExpense);
             // Build salaried income DTO
             IncomeStreamDTO salariedIncome = IncomeStreamDTO.builder()
                     .type(com.lean.lean.csengine.enums.IncomeType.SALARIED)
@@ -229,8 +231,8 @@ public class CreditScoreImpl implements CreditScoreService {
     /**
      * Extract monthly salary data from complete months only
      */
-    private List<BigDecimal> extractMonthlySalaryData(JsonNode incomeNode, int maxMonths) {
-        List<BigDecimal> monthlySalaryList = new ArrayList<>();
+    private List<MonthlyDataDTO> extractMonthlySalaryData(JsonNode incomeNode, int maxMonths) {
+        List<MonthlyDataDTO> monthlySalaryList = new ArrayList<>();
         try {
             JsonNode monthlyTotals = incomeNode.path("insights").path("salary")
                     .path("monthly_totals");
@@ -243,7 +245,17 @@ public class CreditScoreImpl implements CreditScoreService {
             for (JsonNode month : monthlyTotals) {
                 if (month.path("is_month_complete").asBoolean(false)) {
                     double amount = month.path("amount").asDouble(0.0);
-                    monthlySalaryList.add(BigDecimal.valueOf(amount).setScale(2, RoundingMode.HALF_UP));
+                    Integer year = month.path("year").asInt(0);
+                    Integer monthNum = month.path("month").asInt(0);
+                    boolean isComplete = month.path("is_month_complete").asBoolean(false);
+
+                    MonthlyDataDTO monthlyData = MonthlyDataDTO.builder()
+                            .amount(BigDecimal.valueOf(amount).setScale(2, RoundingMode.HALF_UP))
+                            .isComplete(isComplete)
+                            .month(monthNum > 0 ? monthNum : null)
+                            .year(year > 0 ? year : null)
+                            .build();
+                    monthlySalaryList.add(monthlyData);
                 }
 
                 // Limit to maxMonths
@@ -260,8 +272,8 @@ public class CreditScoreImpl implements CreditScoreService {
     /**
      * Extract monthly non-salary data from complete months only
      */
-    private List<BigDecimal> extractMonthlyNonSalaryData(JsonNode incomeNode, int maxMonths) {
-        List<BigDecimal> monthlyNonSalaryList = new ArrayList<>();
+    private List<MonthlyDataDTO> extractMonthlyNonSalaryData(JsonNode incomeNode, int maxMonths) {
+        List<MonthlyDataDTO> monthlyNonSalaryList = new ArrayList<>();
         try {
             JsonNode monthlyTotals = incomeNode.path("insights").path("non_salary")
                     .path("monthly_totals");
@@ -274,7 +286,17 @@ public class CreditScoreImpl implements CreditScoreService {
             for (JsonNode month : monthlyTotals) {
                 if (month.path("is_month_complete").asBoolean(false)) {
                     double amount = month.path("amount").asDouble(0.0);
-                    monthlyNonSalaryList.add(BigDecimal.valueOf(amount).setScale(2, RoundingMode.HALF_UP));
+                    Integer year = month.path("year").asInt(0);
+                    Integer monthNum = month.path("month").asInt(0);
+                    boolean isComplete = month.path("is_month_complete").asBoolean(false);
+
+                    MonthlyDataDTO monthlyData = MonthlyDataDTO.builder()
+                            .amount(BigDecimal.valueOf(amount).setScale(2, RoundingMode.HALF_UP))
+                            .isComplete(isComplete)
+                            .month(monthNum > 0 ? monthNum : null)
+                            .year(year > 0 ? year : null)
+                            .build();
+                    monthlyNonSalaryList.add(monthlyData);
                 }
 
                 // Limit to maxMonths
@@ -291,8 +313,8 @@ public class CreditScoreImpl implements CreditScoreService {
     /**
      * Extract monthly expense data from complete months only
      */
-    private List<BigDecimal> extractMonthlyExpenseData(JsonNode expenseNode, int maxMonths) {
-        List<BigDecimal> monthlyExpenseList = new ArrayList<>();
+    private List<MonthlyDataDTO> extractMonthlyExpenseData(JsonNode expenseNode, int maxMonths) {
+        List<MonthlyDataDTO> monthlyExpenseList = new ArrayList<>();
         try {
             JsonNode monthlyTotals = expenseNode.path("insights").path("monthly_totals");
 
@@ -304,7 +326,17 @@ public class CreditScoreImpl implements CreditScoreService {
             for (JsonNode month : monthlyTotals) {
                 if (month.path("is_month_complete").asBoolean(false)) {
                     double amount = month.path("amount").asDouble(0.0);
-                    monthlyExpenseList.add(BigDecimal.valueOf(amount).setScale(2, RoundingMode.HALF_UP));
+                    Integer year = month.path("year").asInt(0);
+                    Integer monthNum = month.path("month").asInt(0);
+                    boolean isComplete = month.path("is_month_complete").asBoolean(false);
+
+                    MonthlyDataDTO monthlyData = MonthlyDataDTO.builder()
+                            .amount(BigDecimal.valueOf(amount).setScale(2, RoundingMode.HALF_UP))
+                            .isComplete(isComplete)
+                            .month(monthNum > 0 ? monthNum : null)
+                            .year(year > 0 ? year : null)
+                            .build();
+                    monthlyExpenseList.add(monthlyData);
                 }
 
                 // Limit to maxMonths
