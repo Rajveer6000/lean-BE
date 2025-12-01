@@ -150,9 +150,11 @@ public class CreditScoreImpl implements CreditScoreService {
 
             // Build response with inputDTO, config, and calculation results
             Map<String, Object> response = new HashMap<>();
-             response.put("inputDTO", inputDTO);
-             response.put("calculation", calculationResult);
+            response.put("inputDTO", inputDTO);
+            response.put("calculation", calculationResult);
             response.put("configDTO", configDTO);
+            response.put("incomeResponse", incomeResponse);
+            response.put("expenseResponse", expenseResponse);
 
             return response;
         } catch (Exception e) {
@@ -163,42 +165,61 @@ public class CreditScoreImpl implements CreditScoreService {
 
     /**
      * Calculate the count of months for which we have data
-     * Compares first_date_time from both income and expense and uses the earlier
-     * one
+     * Counts only months with non-zero transaction amounts
      */
     private Integer calculateDataMonthCount(JsonNode incomeNode, JsonNode expenseNode) {
         try {
-            // Get first_date_time from income (salary)
-            String incomeFirstDateTime = incomeNode.path("insights").path("salary")
-                    .path("total").path("first_date_time").asText();
+            int incomeMonthCount = 0;
+            int expenseMonthCount = 0;
 
-            // Get first_date_time from expense
-            String expenseFirstDateTime = expenseNode.path("insights").path("total")
-                    .path("first_date_time").asText();
-
-            LocalDate earliestDate = null;
-
-            // Parse income date if available
-            if (incomeFirstDateTime != null && !incomeFirstDateTime.isEmpty()) {
-                LocalDate incomeDate = LocalDate.parse(incomeFirstDateTime.substring(0, 10));
-                earliestDate = incomeDate;
-            }
-
-            // Parse expense date and compare
-            if (expenseFirstDateTime != null && !expenseFirstDateTime.isEmpty()) {
-                LocalDate expenseDate = LocalDate.parse(expenseFirstDateTime.substring(0, 10));
-                if (earliestDate == null || expenseDate.isBefore(earliestDate)) {
-                    earliestDate = expenseDate;
+            // Count months with non-zero salary income
+            JsonNode salaryMonthlyTotals = incomeNode.path("insights").path("salary")
+                    .path("monthly_totals");
+            if (salaryMonthlyTotals.isArray()) {
+                for (JsonNode month : salaryMonthlyTotals) {
+                    if (month.path("is_month_complete").asBoolean(false)) {
+                        double amount = month.path("amount").asDouble(0.0);
+                        if (amount > 0.0) {
+                            incomeMonthCount++;
+                        }
+                    }
                 }
             }
 
-            if (earliestDate == null) {
-                return null;
+            // Also consider non-salary income months
+            JsonNode nonSalaryMonthlyTotals = incomeNode.path("insights").path("non_salary")
+                    .path("monthly_totals");
+            if (nonSalaryMonthlyTotals.isArray()) {
+                int nonSalaryMonths = 0;
+                for (JsonNode month : nonSalaryMonthlyTotals) {
+                    if (month.path("is_month_complete").asBoolean(false)) {
+                        double amount = month.path("amount").asDouble(0.0);
+                        if (amount > 0.0) {
+                            nonSalaryMonths++;
+                        }
+                    }
+                }
+                // Use the maximum between salary and non-salary months
+                incomeMonthCount = Math.max(incomeMonthCount, nonSalaryMonths);
             }
 
-            LocalDate currentDate = LocalDate.now();
-            long months = java.time.temporal.ChronoUnit.MONTHS.between(earliestDate, currentDate);
-            return (int) months;
+            // Count months with non-zero expense
+            JsonNode expenseMonthlyTotals = expenseNode.path("insights").path("monthly_totals");
+            if (expenseMonthlyTotals.isArray()) {
+                for (JsonNode month : expenseMonthlyTotals) {
+                    if (month.path("is_month_complete").asBoolean(false)) {
+                        double amount = month.path("amount").asDouble(0.0);
+                        if (amount > 0.0) {
+                            expenseMonthCount++;
+                        }
+                    }
+                }
+            }
+
+            // Return the maximum between income and expense month counts
+            int maxMonthCount = Math.max(incomeMonthCount, expenseMonthCount);
+
+            return maxMonthCount > 0 ? maxMonthCount : null;
         } catch (Exception e) {
             log.error("Error calculating data month count", e);
             return null;
