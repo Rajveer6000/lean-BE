@@ -143,20 +143,13 @@ public class CreditScoreImpl implements CreditScoreService {
                     .dataMonthCountSource(DataSource.CALCULATED)
                     .build();
 
-            // Fetch credit score configuration (using default engine config ID = 1)
-            CreditScoreConfigDTO configDTO = creditScoreConfigService.getEngineConfiguration(1L);
 
             // Calculate credit score using the calculation engine
             Map<String, Object> calculationResult = creditScoreCalculationService.calculateCreditScore(
                     userId, inputDTO, 1L);
 
-            // Build response with inputDTO, config, and calculation results
             Map<String, Object> response = new HashMap<>();
-            response.put("inputDTO", inputDTO);
             response.put("calculation", calculationResult);
-            response.put("configDTO", configDTO);
-            response.put("incomeResponse", incomeResponse);
-            response.put("expenseResponse", expenseResponse);
 
             return response;
         } catch (Exception e) {
