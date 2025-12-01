@@ -8,6 +8,7 @@ import com.lean.lean.csengine.dto.CreditScoreConfigDTO;
 import com.lean.lean.csengine.dto.IncomeStreamDTO;
 import com.lean.lean.csengine.dto.MonthlyDataDTO;
 import com.lean.lean.csengine.dto.RentSavvyScoreInputDTO;
+import com.lean.lean.csengine.dto.ScoreCalculationRequestDTO;
 import com.lean.lean.dao.LeanEntity;
 import com.lean.lean.dao.User;
 import com.lean.lean.repository.LeanEntityRepository;
@@ -60,7 +61,9 @@ public class CreditScoreImpl implements CreditScoreService {
     private final ExecutorService apiExecutor = Executors.newFixedThreadPool(10);
 
     @Override
-    public Map<String, Object> calculateScore(Long userId, Integer historyMonths) {
+    public Map<String, Object> calculateScore(ScoreCalculationRequestDTO request) {
+        Long userId = request.getUserId();
+        Integer historyMonths = request.getHistoryMonths();
         try {
             User user = userRepository.findById(userId)
                     .orElseThrow(() -> new RuntimeException("User not found"));
@@ -129,15 +132,15 @@ public class CreditScoreImpl implements CreditScoreService {
                     .averageMonthlyIncomeSource(DataSource.CALCULATED)
                     .averageMonthlyExpense(averageMonthlyExpense)
                     .averageMonthlyExpenseSource(DataSource.CALCULATED)
-                    .declaredMonthlyIncome(new BigDecimal("12000"))
+                    .declaredMonthlyIncome(request.getDeclaredMonthlyIncome())
                     .declaredMonthlyIncomeSource(DataSource.DEFAULT)
-                    .declaredMonthlyExpense(new BigDecimal("5000"))
+                    .declaredMonthlyExpense(request.getDeclaredMonthlyExpense())
                     .declaredMonthlyExpenseSource(DataSource.DEFAULT)
-                    .employmentTenureInMonths(24)
+                    .employmentTenureInMonths(request.getEmploymentTenureInMonths())
                     .employmentTenureSource(DataSource.DEFAULT)
-                    .numberOfDependents(2)
+                    .numberOfDependents(request.getNumberOfDependents())
                     .numberOfDependentsSource(DataSource.DEFAULT)
-                    .aecbScore(710)
+                    .aecbScore(request.getAecbScore())
                     .aecbScoreSource(DataSource.AECB)
                     .dataMonthCount(dataMonthCount)
                     .dataMonthCountSource(DataSource.CALCULATED)
