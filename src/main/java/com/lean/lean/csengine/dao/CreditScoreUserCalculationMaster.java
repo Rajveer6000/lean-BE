@@ -74,5 +74,5 @@ public class CreditScoreUserCalculationMaster {
     private LocalDateTime updatedAt = LocalDateTime.now();
 
     @Column(name = "UpdatedBy", length = 255)
-    private String updatedBy;
+    private Long updatedBy;
 }

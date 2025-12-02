@@ -4,6 +4,7 @@ import com.lean.lean.csengine.dao.*;
 import com.lean.lean.csengine.dto.*;
 import com.lean.lean.csengine.enums.CalculationStatus;
 import com.lean.lean.csengine.enums.DataSource;
+import com.lean.lean.csengine.enums.LogLevel;
 import com.lean.lean.csengine.repository.*;
 import com.lean.lean.csengine.util.CalculationUtils;
 import lombok.RequiredArgsConstructor;
@@ -38,7 +39,7 @@ public class CreditScoreCalculationService {
     private final EngineConfigRepository engineConfigRepository;
     private final ScoringMainCategoryRepository scoringMainCategoryRepository;
     private final CreditScoreAdjustmentRulesRepository creditScoreAdjustmentRulesRepository;
-
+    private final RiskTierConfigRepository riskTierConfigRepository;
     /**
      * Main entry point for credit score calculation
      */
@@ -58,39 +59,48 @@ public class CreditScoreCalculationService {
 
             // 4. Save all meta information
             saveMetaInformation(master, inputDTO);
-            logCalculationStep(master.getId(), "Meta information saved", "All input data persisted");
+            logCalculationStep(master.getId(), "Meta information saved", "All input data persisted",userId,engineConfigId,LogLevel.INFO);
 
             // 5. Calculate category type scores
             List<CategoryCalculationResult> categoryResults = calculateCategoryScores(master.getId(), inputDTO, config);
             logCalculationStep(master.getId(), "Category type scores calculated",
-                    "Total category types: " + categoryResults.size());
+                    "Total category types: " + categoryResults.size(),userId,engineConfigId,LogLevel.INFO);
 
             // 6. Calculate main category scores by aggregating category type scores
             List<MainCategoryCalculationResult> mainCategoryResults = calculateMainCategoryScores(categoryResults,
                     config);
             BigDecimal totalCategoryScore = saveMainCategoryCalculations(master.getId(), mainCategoryResults);
             logCalculationStep(master.getId(), "Main category scores calculated",
-                    "Total category score: " + totalCategoryScore);
+                    "Total category score: " + totalCategoryScore,userId,engineConfigId,LogLevel.INFO);
+            master.setBaseScore(totalCategoryScore);
 
             // 7. Apply adjustment rules
             List<AdjustmentRuleResult> adjustmentResults = applyAdjustmentRules(master.getId(), inputDTO, config);
             BigDecimal totalAdjustments = saveAdjustmentRuleCalculations(master.getId(), adjustmentResults);
             logCalculationStep(master.getId(), "Adjustment rules applied",
-                    "Total adjustments: " + totalAdjustments);
-
+                    "Total adjustments: " + totalAdjustments,userId,engineConfigId,LogLevel.INFO);
+            master.setAdditionalScore(totalAdjustments);
             // 8. Calculate final score
             BigDecimal finalScore = calculateFinalScore(totalCategoryScore, totalAdjustments, config);
+            master.setFinalScore(finalScore);
             finalScore = CalculationUtils.capScore(finalScore, config.getEngineConfig().getScoreCap());
+            master.setFinalScoreCapped(finalScore);
+            CreditScoreConfigDTO.RiskTierInfo riskTier = determineRiskTier(finalScore, config);
+            master.setTier(riskTierConfigRepository.getReferenceById(riskTier.getId()));
+            master.setRiskLevel(riskTier.getRiskLevel());
+            master.setRiskTier(riskTier.getRiskTier());
+            master.setCalculationStatus(CalculationStatus.COMPLETED);
+            master.setMaxRentLimit(
+                    riskTier.getRentLimitPercentage()
+                            .multiply(inputDTO.getAverageMonthlyIncome())
+                            .divide(new BigDecimal("100"), 2, RoundingMode.HALF_UP)
+            );
 
-            // 9. Determine risk tier
-            String riskTier = determineRiskTier(finalScore, config);
-
-            // 10. Update master with final score and complete status
-            completeMasterRecord(master, finalScore, riskTier);
             logCalculationStep(master.getId(), "Calculation completed",
-                    "Final score: " + finalScore + ", Risk Tier: " + riskTier);
+                    "Final score: " + finalScore + ", Risk Tier: " + riskTier,userId,engineConfigId,LogLevel.INFO);
 
-            // 11. Build response
+            master.setUpdatedAt(LocalDateTime.now());
+            masterRepository.save(master);
             Map<String, Object> response = new HashMap<>();
             response.put("calculationId", master.getId());
             response.put("userId", userId);
@@ -116,7 +126,8 @@ public class CreditScoreCalculationService {
                 .orElseThrow(() -> new RuntimeException("EngineConfig not found with id: " + engineConfigId)));
         master.setCalculationStatus(CalculationStatus.PENDING);
         master.setCreatedAt(LocalDateTime.now());
-
+        master.setCreatedBy(userId);
+        master.setUpdatedBy(userId);
         return masterRepository.save(master);
     }
 
@@ -597,15 +608,19 @@ public class CreditScoreCalculationService {
         return categoryScore.add(adjustments).setScale(2, RoundingMode.HALF_UP);
     }
 
-    private String determineRiskTier(BigDecimal finalScore, CreditScoreConfigDTO config) {
+    private CreditScoreConfigDTO.RiskTierInfo determineRiskTier(
+            BigDecimal finalScore,
+            CreditScoreConfigDTO config
+    ) {
         for (CreditScoreConfigDTO.RiskTierInfo tier : config.getRiskTiers()) {
             if (finalScore.compareTo(tier.getMinScore()) >= 0 &&
                     finalScore.compareTo(tier.getMaxScore()) <= 0) {
-                return tier.getRiskTier();
+                return tier;   // return the entire object
             }
         }
-        return "Unknown";
+        return null; // or Optional.empty(), depending on your design
     }
+
 
     private void completeMasterRecord(CreditScoreUserCalculationMaster master,
             BigDecimal finalScore, String riskTier) {
@@ -616,12 +631,17 @@ public class CreditScoreCalculationService {
         masterRepository.save(master);
     }
 
-    private void logCalculationStep(Long masterId, String step, String details) {
+    private void logCalculationStep(Long masterId, String step, String details,Long userID,Long engineId, LogLevel logLevel ) {
         CreditScoreUserCalculationLogs log = new CreditScoreUserCalculationLogs();
         log.setUserCalculationMaster(creditScoreUserCalculationMasterRepository.getById(masterId));
         log.setLogMessage(step);
+        log.setUserId(userID);
+        log.setConfig(engineConfigRepository.findById(engineId).get());
+        log.setLogLevel(logLevel);
         log.setLogMessage(details);
         log.setCreatedAt(LocalDateTime.now());
+        log.setCreatedBy(String.valueOf(userID));
+        log.setUpdatedBy(String.valueOf(userID));
         logsRepository.save(log);
     }
 
