@@ -11,4 +11,7 @@ public interface CreditScoreAdjustmentRulesConfigRepository
         extends JpaRepository<CreditScoreAdjustmentRulesConfig, Long> {
 
     List<CreditScoreAdjustmentRulesConfig> findByAdjustmentRulesId(Long adjustmentRulesId);
+
+    List<CreditScoreAdjustmentRulesConfig> findByAdjustmentRulesIdIn(List<Long> adjustmentRulesIds);
+
 }

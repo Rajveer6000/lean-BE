@@ -7,8 +7,8 @@ import com.lean.lean.csengine.enums.DataSource;
 import com.lean.lean.csengine.enums.LogLevel;
 import com.lean.lean.csengine.repository.*;
 import com.lean.lean.csengine.util.CalculationUtils;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,81 +26,105 @@ import java.util.stream.Collectors;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class CreditScoreCalculationService {
 
-    private final CreditScoreUserCalculationMasterRepository masterRepository;
-    private final CreditScoreUserCalculationMetaInformationRepository metaInfoRepository;
-    private final CategoryCalculationsRepository categoryCalculationsRepository;
-    private final AdjustmentRulesCalculationsRepository adjustmentRulesCalculationsRepository;
-    private final CreditScoreUserCalculationLogsRepository logsRepository;
-    private final CreditScoreConfigService configService;
-    private final CreditScoreUserCalculationMasterRepository creditScoreUserCalculationMasterRepository;
-    private final EngineConfigRepository engineConfigRepository;
-    private final ScoringMainCategoryRepository scoringMainCategoryRepository;
-    private final CreditScoreAdjustmentRulesRepository creditScoreAdjustmentRulesRepository;
-    private final RiskTierConfigRepository riskTierConfigRepository;
+    @Autowired
+    private CreditScoreUserCalculationMasterRepository masterRepository;
+
+    @Autowired
+    private CreditScoreUserCalculationMetaInformationRepository metaInfoRepository;
+
+    @Autowired
+    private CategoryCalculationsRepository categoryCalculationsRepository;
+
+    @Autowired
+    private AdjustmentRulesCalculationsRepository adjustmentRulesCalculationsRepository;
+
+    @Autowired
+    private CreditScoreUserCalculationLogsRepository logsRepository;
+
+
+
+    @Autowired
+    private EngineConfigRepository engineConfigRepository;
+
+    @Autowired
+    private ScoringMainCategoryRepository scoringMainCategoryRepository;
+
+    @Autowired
+    private CreditScoreAdjustmentRulesRepository creditScoreAdjustmentRulesRepository;
+
+    @Autowired
+    private RiskTierConfigRepository riskTierConfigRepository;
+
+
+
+
     /**
-     * Main entry point for credit score calculation
+     * Overloaded entry point accepting pre-fetched configuration
      */
     @Transactional
-    public Map<String, Object> calculateCreditScore(Long userId, RentSavvyScoreInputDTO inputDTO, Long engineConfigId) {
+    public Map<String, Object> calculateCreditScore(Long userId, RentSavvyScoreInputDTO inputDTO, CreditScoreConfigDTO config) {
+        Long engineConfigId = config.getEngineConfig().getId();
         log.info("Starting credit score calculation for user: {}", userId);
 
         try {
             // 1. Create master calculation record with PENDING status
             CreditScoreUserCalculationMaster master = createMasterRecord(userId, engineConfigId);
 
-            // 2. Fetch configuration
-            CreditScoreConfigDTO config = configService.getEngineConfiguration(engineConfigId);
-
-            // 3. Update status to IN_PROGRESS
+            // 2. Update status to IN_PROGRESS
             updateMasterStatus(master, CalculationStatus.IN_PROGRESS);
 
-            // 4. Save all meta information
+            // 3. Save all meta information
             saveMetaInformation(master, inputDTO);
-            logCalculationStep(master.getId(), "Meta information saved", "All input data persisted",userId,engineConfigId,LogLevel.INFO);
+            logCalculationStep(master.getId(), "Meta information saved", "All input data persisted", userId, engineConfigId, LogLevel.INFO);
 
-            // 5. Calculate category type scores
+            // 4. Calculate category type scores
             List<CategoryCalculationResult> categoryResults = calculateCategoryScores(master.getId(), inputDTO, config);
             logCalculationStep(master.getId(), "Category type scores calculated",
-                    "Total category types: " + categoryResults.size(),userId,engineConfigId,LogLevel.INFO);
+                    "Total category types: " + categoryResults.size(), userId, engineConfigId, LogLevel.INFO);
 
-            // 6. Calculate main category scores by aggregating category type scores
-            List<MainCategoryCalculationResult> mainCategoryResults = calculateMainCategoryScores(categoryResults,
-                    config);
-            BigDecimal totalCategoryScore = saveMainCategoryCalculations(master.getId(), mainCategoryResults);
+            // 5. Calculate main category scores by aggregating category type scores
+            List<MainCategoryCalculationResult> mainCategoryResults = calculateMainCategoryScores(categoryResults, config);
+            BigDecimal totalCategoryScore = saveMainCategoryCalculations(master, mainCategoryResults);
             logCalculationStep(master.getId(), "Main category scores calculated",
-                    "Total category score: " + totalCategoryScore,userId,engineConfigId,LogLevel.INFO);
+                    "Total category score: " + totalCategoryScore, userId, engineConfigId, LogLevel.INFO);
             master.setBaseScore(totalCategoryScore);
 
-            // 7. Apply adjustment rules
+            // 6. Apply adjustment rules
             List<AdjustmentRuleResult> adjustmentResults = applyAdjustmentRules(master.getId(), inputDTO, config);
-            BigDecimal totalAdjustments = saveAdjustmentRuleCalculations(master.getId(), adjustmentResults);
+            BigDecimal totalAdjustments = saveAdjustmentRuleCalculations(master, adjustmentResults);
             logCalculationStep(master.getId(), "Adjustment rules applied",
-                    "Total adjustments: " + totalAdjustments,userId,engineConfigId,LogLevel.INFO);
+                    "Total adjustments: " + totalAdjustments, userId, engineConfigId, LogLevel.INFO);
             master.setAdditionalScore(totalAdjustments);
-            // 8. Calculate final score
+
+            // 7. Calculate final score
             BigDecimal finalScore = calculateFinalScore(totalCategoryScore, totalAdjustments, config);
             master.setFinalScore(finalScore);
             finalScore = CalculationUtils.capScore(finalScore, config.getEngineConfig().getScoreCap());
             master.setFinalScoreCapped(finalScore);
+
             CreditScoreConfigDTO.RiskTierInfo riskTier = determineRiskTier(finalScore, config);
-            master.setTier(riskTierConfigRepository.getReferenceById(riskTier.getId()));
-            master.setRiskLevel(riskTier.getRiskLevel());
-            master.setRiskTier(riskTier.getRiskTier());
+            if (riskTier != null) {
+                master.setTier(riskTierConfigRepository.getReferenceById(riskTier.getId()));
+                master.setRiskLevel(riskTier.getRiskLevel());
+                master.setRiskTier(riskTier.getRiskTier());
+                if (riskTier.getRentLimitPercentage() != null && inputDTO.getAverageMonthlyIncome() != null) {
+                    master.setMaxRentLimit(
+                            riskTier.getRentLimitPercentage()
+                                    .multiply(inputDTO.getAverageMonthlyIncome())
+                                    .divide(new BigDecimal("100"), 2, RoundingMode.HALF_UP)
+                    );
+                }
+            }
+
             master.setCalculationStatus(CalculationStatus.COMPLETED);
-            master.setMaxRentLimit(
-                    riskTier.getRentLimitPercentage()
-                            .multiply(inputDTO.getAverageMonthlyIncome())
-                            .divide(new BigDecimal("100"), 2, RoundingMode.HALF_UP)
-            );
-
-            logCalculationStep(master.getId(), "Calculation completed",
-                    "Final score: " + finalScore + ", Risk Tier: " + riskTier,userId,engineConfigId,LogLevel.INFO);
-
             master.setUpdatedAt(LocalDateTime.now());
             masterRepository.save(master);
+
+            logCalculationStep(master.getId(), "Calculation completed",
+                    "Final score: " + finalScore + ", Risk Tier: " + (riskTier != null ? riskTier.getRiskTier() : "N/A"), userId, engineConfigId, LogLevel.INFO);
+
             Map<String, Object> response = new HashMap<>();
             response.put("calculationId", master.getId());
             response.put("userId", userId);
@@ -222,6 +246,9 @@ public class CreditScoreCalculationService {
         meta.setValue(value);
         meta.setSource(source != null ? source.name() : null);
         meta.setCreatedAt(LocalDateTime.now());
+        meta.setCreatedBy(master.getUserId());
+        meta.setUpdatedAt(LocalDateTime.now());
+        meta.setUpdatedBy(master.getUserId());
         return meta;
     }
 
@@ -334,40 +361,6 @@ public class CreditScoreCalculationService {
         return null;
     }
 
-    private BigDecimal saveCategoryCalculations(Long masterId, List<CategoryCalculationResult> results) {
-        BigDecimal total = BigDecimal.ZERO;
-
-        for (CategoryCalculationResult result : results) {
-            CategoryCalculations calc = new CategoryCalculations();
-            calc.setUserCalculationMaster(creditScoreUserCalculationMasterRepository.getById(masterId));
-
-            // Set the main category using the mainCategoryId from result
-            ScoringMainCategory mainCategory = scoringMainCategoryRepository.findById(result.getMainCategoryId())
-                    .orElseThrow(() -> new RuntimeException(
-                            "Main category not found with id: " + result.getMainCategoryId()));
-            calc.setMainCategory(mainCategory);
-
-            // Store calculation details as inputValues (JSON)
-            Map<String, Object> inputData = new HashMap<>();
-            inputData.put("rawValue", result.getRawValue());
-            inputData.put("rawScore", result.getRawScore());
-            inputData.put("weightedScore", result.getWeightedScore());
-            inputData.put("weightage", result.getWeightage());
-            inputData.put("categoryTypeName", result.getCategoryTypeName());
-            inputData.put("calculationDetails", result.getCalculationDetails());
-            calc.setInputValues(inputData);
-
-            // Set the weighted score as the final score
-            calc.setScore(result.getWeightedScore());
-            calc.setCreatedAt(LocalDateTime.now());
-
-            categoryCalculationsRepository.save(calc);
-            total = total.add(result.getWeightedScore());
-        }
-
-        return total.setScale(2, RoundingMode.HALF_UP);
-    }
-
     /**
      * Calculate main category scores by aggregating category type scores
      * Formula: Main Category Score = (Sum of Category Type Weighted Scores) * (Main
@@ -439,21 +432,19 @@ public class CreditScoreCalculationService {
     /**
      * Save main category calculations and return total score
      */
-    private BigDecimal saveMainCategoryCalculations(Long masterId,
+    private BigDecimal saveMainCategoryCalculations(CreditScoreUserCalculationMaster master,
             List<MainCategoryCalculationResult> mainCategoryResults) {
         BigDecimal totalScore = BigDecimal.ZERO;
+        List<CategoryCalculations> calculationsToSave = new ArrayList<>();
 
         for (MainCategoryCalculationResult mainCatResult : mainCategoryResults) {
+            // Use getReferenceById to avoid DB hit, assuming ID is valid from config
+            ScoringMainCategory mainCategory = scoringMainCategoryRepository.getReferenceById(mainCatResult.getMainCategoryId());
+
             // Save each category type calculation within the main category
             for (CategoryCalculationResult categoryTypeResult : mainCatResult.getCategoryTypeResults()) {
                 CategoryCalculations calc = new CategoryCalculations();
-                calc.setUserCalculationMaster(creditScoreUserCalculationMasterRepository.getById(masterId));
-
-                // Set the main category using the mainCategoryId from result
-                ScoringMainCategory mainCategory = scoringMainCategoryRepository
-                        .findById(mainCatResult.getMainCategoryId())
-                        .orElseThrow(() -> new RuntimeException(
-                                "Main category not found with id: " + mainCatResult.getMainCategoryId()));
+                calc.setUserCalculationMaster(master);
                 calc.setMainCategory(mainCategory);
 
                 // Store calculation details as inputValues (JSON)
@@ -473,14 +464,18 @@ public class CreditScoreCalculationService {
                 // have the same score)
                 calc.setScore(mainCatResult.getFinalMainCategoryScore());
                 calc.setCreatedAt(LocalDateTime.now());
+                calc.setCreatedBy(master.getUserId());
+                calc.setUpdatedAt(LocalDateTime.now());
+                calc.setUpdatedBy(master.getUserId());
 
-                categoryCalculationsRepository.save(calc);
+                calculationsToSave.add(calc);
             }
 
             // Add this main category's final score to the total
             totalScore = totalScore.add(mainCatResult.getFinalMainCategoryScore());
         }
 
+        categoryCalculationsRepository.saveAll(calculationsToSave);
         return totalScore.setScale(2, RoundingMode.HALF_UP);
     }
 
@@ -564,18 +559,17 @@ public class CreditScoreCalculationService {
                 .build();
     }
 
-    private BigDecimal saveAdjustmentRuleCalculations(Long masterId, List<AdjustmentRuleResult> results) {
+    private BigDecimal saveAdjustmentRuleCalculations(CreditScoreUserCalculationMaster master, List<AdjustmentRuleResult> results) {
         BigDecimal total = BigDecimal.ZERO;
+        List<AdjustmentRulesCalculations> calculationsToSave = new ArrayList<>();
 
         for (AdjustmentRuleResult result : results) {
             AdjustmentRulesCalculations calc = new AdjustmentRulesCalculations();
-            calc.setUserCalculationMaster(creditScoreUserCalculationMasterRepository.getById(masterId));
+            calc.setUserCalculationMaster(master);
 
-            // Set the bonusPenalty relationship using the adjustment rule ID from result
+            // Use getReferenceById to avoid DB hit
             CreditScoreAdjustmentRules adjustmentRule = creditScoreAdjustmentRulesRepository
-                    .findById(result.getAdjustmentRuleId())
-                    .orElseThrow(() -> new RuntimeException(
-                            "Adjustment rule not found with id: " + result.getAdjustmentRuleId()));
+                    .getReferenceById(result.getAdjustmentRuleId());
             calc.setBonusPenalty(adjustmentRule);
 
             // Set whether the condition was met (applied)
@@ -592,14 +586,18 @@ public class CreditScoreCalculationService {
             // Set points awarded (only if applied, otherwise zero)
             calc.setPointsAwarded(result.getApplied() ? result.getPoints() : BigDecimal.ZERO);
             calc.setCreatedAt(LocalDateTime.now());
+            calc.setCreatedBy(master.getUserId());
+            calc.setUpdatedAt(LocalDateTime.now());
+            calc.setUpdatedBy(master.getUserId());
 
-            adjustmentRulesCalculationsRepository.save(calc);
+            calculationsToSave.add(calc);
 
             if (result.getApplied()) {
                 total = total.add(result.getPoints());
             }
         }
 
+        adjustmentRulesCalculationsRepository.saveAll(calculationsToSave);
         return total.setScale(2, RoundingMode.HALF_UP);
     }
 
@@ -631,17 +629,17 @@ public class CreditScoreCalculationService {
         masterRepository.save(master);
     }
 
-    private void logCalculationStep(Long masterId, String step, String details,Long userID,Long engineId, LogLevel logLevel ) {
+    private void logCalculationStep(Long masterId, String step, String details, Long userID, Long engineId, LogLevel logLevel ) {
         CreditScoreUserCalculationLogs log = new CreditScoreUserCalculationLogs();
-        log.setUserCalculationMaster(creditScoreUserCalculationMasterRepository.getById(masterId));
+        log.setUserCalculationMaster(masterRepository.getReferenceById(masterId)); // Use reference
         log.setLogMessage(step);
         log.setUserId(userID);
-        log.setConfig(engineConfigRepository.findById(engineId).get());
+        log.setConfig(engineConfigRepository.getReferenceById(engineId)); // Use reference
         log.setLogLevel(logLevel);
         log.setLogMessage(details);
         log.setCreatedAt(LocalDateTime.now());
-        log.setCreatedBy(String.valueOf(userID));
-        log.setUpdatedBy(String.valueOf(userID));
+        log.setCreatedBy(userID);
+        log.setUpdatedBy(userID);
         logsRepository.save(log);
     }
 

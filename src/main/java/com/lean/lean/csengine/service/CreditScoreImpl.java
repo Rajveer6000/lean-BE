@@ -12,11 +12,10 @@ import com.lean.lean.csengine.dto.ScoreCalculationRequestDTO;
 import com.lean.lean.dao.LeanEntity;
 import com.lean.lean.dao.User;
 import com.lean.lean.repository.LeanEntityRepository;
-import com.lean.lean.repository.LeanUserRepository;
+
 import com.lean.lean.repository.UserRepository;
 import com.lean.lean.service.LeanReportService;
 import com.lean.lean.util.LeanApiUtil;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -28,18 +27,17 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.CompletableFuture;
+
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class CreditScoreImpl implements CreditScoreService {
+
     @Autowired
     private UserRepository userRepository;
 
-    @Autowired
-    private LeanUserRepository leanUserRepository;
+
 
     @Autowired
     private LeanApiUtil leanApiUtil;
@@ -56,34 +54,89 @@ public class CreditScoreImpl implements CreditScoreService {
     @Autowired
     private CreditScoreCalculationService creditScoreCalculationService;
 
-    private final ObjectMapper objectMapper;
-
-    private final ExecutorService apiExecutor = Executors.newFixedThreadPool(10);
+    @Autowired
+    private ObjectMapper objectMapper;
 
     @Override
     public Map<String, Object> calculateScore(ScoreCalculationRequestDTO request) {
         Long userId = request.getUserId();
+        if (userId == null) {
+            throw new IllegalArgumentException("User ID cannot be null");
+        }
         Integer historyMonths = request.getHistoryMonths();
         try {
-            User user = userRepository.findById(userId)
-                    .orElseThrow(() -> new RuntimeException("User not found"));
+            // Parallel fetch: User, LeanEntity, AccessToken
+            CompletableFuture<User> userFuture = CompletableFuture.supplyAsync(() ->
+                    userRepository.findById(userId)
+                            .orElseThrow(() -> new RuntimeException("User not found")));
 
-            LeanEntity leanEntity = leanEntityRepository.findByUserId(userId.toString())
-                    .orElseThrow(() -> new RuntimeException("LeanEntity not found for user"));
+            CompletableFuture<LeanEntity> leanEntityFuture = CompletableFuture.supplyAsync(() ->
+                    leanEntityRepository.findByUserId(userId.toString())
+                            .orElseThrow(() -> new RuntimeException("LeanEntity not found for user")));
 
+            CompletableFuture<String> accessTokenFuture = CompletableFuture.supplyAsync(() ->
+                    leanApiUtil.getAccessToken());
+
+            // Wait for essential data
+            CompletableFuture.allOf(userFuture, leanEntityFuture, accessTokenFuture).join();
+
+            User user = userFuture.get();
+            LeanEntity leanEntity = leanEntityFuture.get();
+            String accessToken = accessTokenFuture.get();
             LocalDate startLocalDate = LocalDate.now().minusMonths(historyMonths);
-            String accessToken = leanApiUtil.getAccessToken();
 
-            // Fetch only Income and Expense insights
-            log.info("Fetching Income Insights for User {}", userId);
-            Object incomeResponse = leanApiUtil.getIncomeInsights(
-                    leanEntity.getEntityId(), startLocalDate, "ALL", accessToken);
-            leanReportService.captureIncomeReport(userId, startLocalDate, "ALL", incomeResponse);
+            long parallelStart = System.currentTimeMillis();
+            
+            // Parallel fetch: Income, Expense Insights, and Config
+            CompletableFuture<Object> incomeResponseFuture = CompletableFuture.supplyAsync(() -> {
+                long start = System.currentTimeMillis();
+                log.info("Fetching Income Insights for User {}", userId);
+                Object result = leanApiUtil.getIncomeInsights(leanEntity.getEntityId(), startLocalDate, "ALL", accessToken);
+                log.info("Income Insights fetch took {} ms", System.currentTimeMillis() - start);
+                return result;
+            });
 
-            log.info("Fetching Expense Insights for User {}", userId);
-            Object expenseResponse = leanApiUtil.getExpensesInsights(
-                    leanEntity.getEntityId(), startLocalDate, accessToken);
-            leanReportService.captureExpenseReport(userId, startLocalDate, expenseResponse);
+            CompletableFuture<Object> expenseResponseFuture = CompletableFuture.supplyAsync(() -> {
+                long start = System.currentTimeMillis();
+                log.info("Fetching Expense Insights for User {}", userId);
+                Object result = leanApiUtil.getExpensesInsights(leanEntity.getEntityId(), startLocalDate, accessToken);
+                log.info("Expense Insights fetch took {} ms", System.currentTimeMillis() - start);
+                return result;
+            });
+
+            CompletableFuture<CreditScoreConfigDTO> configFuture = CompletableFuture.supplyAsync(() -> {
+                long start = System.currentTimeMillis();
+                log.info("Fetching Engine Configuration");
+                CreditScoreConfigDTO result = creditScoreConfigService.getEngineConfiguration(1L);
+                log.info("Engine Config fetch took {} ms", System.currentTimeMillis() - start);
+                return result;
+            });
+
+            // Wait for insights and config
+            CompletableFuture.allOf(incomeResponseFuture, expenseResponseFuture, configFuture).join();
+            
+            log.info("Total parallel execution time: {} ms", System.currentTimeMillis() - parallelStart);
+
+            Object incomeResponse = incomeResponseFuture.get();
+            Object expenseResponse = expenseResponseFuture.get();
+            CreditScoreConfigDTO config = configFuture.get();
+
+            // Async Report Generation (Fire and Forget)
+            CompletableFuture.runAsync(() -> {
+                try {
+                    leanReportService.captureIncomeReport(userId, startLocalDate, "ALL", incomeResponse);
+                } catch (Exception e) {
+                    log.error("Error capturing income report asynchronously", e);
+                }
+            });
+
+            CompletableFuture.runAsync(() -> {
+                try {
+                    leanReportService.captureExpenseReport(userId, startLocalDate, expenseResponse);
+                } catch (Exception e) {
+                    log.error("Error capturing expense report asynchronously", e);
+                }
+            });
 
             // Parse JSON responses
             JsonNode incomeNode = parseJson(incomeResponse);
@@ -149,7 +202,7 @@ public class CreditScoreImpl implements CreditScoreService {
 
             // Calculate credit score using the calculation engine
             Map<String, Object> calculationResult = creditScoreCalculationService.calculateCreditScore(
-                    userId, inputDTO, 1L);
+                    userId, inputDTO, config);
 
             Map<String, Object> response = new HashMap<>();
             response.put("calculation", calculationResult);

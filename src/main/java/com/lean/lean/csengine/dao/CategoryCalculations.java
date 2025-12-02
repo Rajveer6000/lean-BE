@@ -38,12 +38,12 @@ public class CategoryCalculations {
     @Column(name = "CreatedAt", nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
-    @Column(name = "CreatedBy", length = 255)
-    private String createdBy;
+    @Column(name = "CreatedBy")
+    private Long createdBy;
 
     @Column(name = "UpdatedAt", nullable = false)
     private LocalDateTime updatedAt = LocalDateTime.now();
 
-    @Column(name = "UpdatedBy", length = 255)
-    private String updatedBy;
+    @Column(name = "UpdatedBy")
+    private Long updatedBy;
 }

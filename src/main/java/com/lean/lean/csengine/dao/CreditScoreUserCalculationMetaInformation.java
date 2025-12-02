@@ -52,6 +52,6 @@ public class CreditScoreUserCalculationMetaInformation {
     @Column(name = "UpdatedAt", nullable = false)
     private LocalDateTime updatedAt = LocalDateTime.now();
 
-    @Column(name = "UpdatedBy", length = 255)
-    private String updatedBy;
+    @Column(name = "UpdatedBy")
+    private Long updatedBy;
 }

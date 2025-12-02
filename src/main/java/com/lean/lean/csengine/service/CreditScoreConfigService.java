@@ -4,28 +4,46 @@ import com.lean.lean.csengine.dao.*;
 import com.lean.lean.csengine.dto.CreditScoreConfigDTO;
 import com.lean.lean.csengine.dto.CreditScoreConfigDTO.*;
 import com.lean.lean.csengine.repository.*;
-import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
  * Service to fetch Credit Score Engine Configuration
  */
+@Slf4j
 @Service
-@RequiredArgsConstructor
 public class CreditScoreConfigService {
 
-    private final EngineConfigRepository engineConfigRepository;
-    private final ScoringMainCategoryRepository scoringMainCategoryRepository;
-    private final ScoringCategoryTypeRepository scoringCategoryTypeRepository;
-    private final ScoringCategoryConfigMasterRepository scoringCategoryConfigMasterRepository;
-    private final ScoringCategoryConfigThresholdRepository scoringCategoryConfigThresholdRepository;
-    private final CreditScoreAdjustmentRulesRepository creditScoreAdjustmentRulesRepository;
-    private final CreditScoreAdjustmentRulesConfigRepository creditScoreAdjustmentRulesConfigRepository;
-    private final RiskTierConfigRepository riskTierConfigRepository;
+    @Autowired
+    private EngineConfigRepository engineConfigRepository;
+
+    @Autowired
+    private ScoringMainCategoryRepository scoringMainCategoryRepository;
+
+    @Autowired
+    private ScoringCategoryTypeRepository scoringCategoryTypeRepository;
+
+    @Autowired
+    private ScoringCategoryConfigMasterRepository scoringCategoryConfigMasterRepository;
+
+    @Autowired
+    private ScoringCategoryConfigThresholdRepository scoringCategoryConfigThresholdRepository;
+
+    @Autowired
+    private CreditScoreAdjustmentRulesRepository creditScoreAdjustmentRulesRepository;
+
+    @Autowired
+    private CreditScoreAdjustmentRulesConfigRepository creditScoreAdjustmentRulesConfigRepository;
+
+    @Autowired
+    private RiskTierConfigRepository riskTierConfigRepository;
 
     /**
      * Get complete engine configuration by ID
@@ -35,29 +53,34 @@ public class CreditScoreConfigService {
      */
     @Transactional(readOnly = true)
     public CreditScoreConfigDTO getEngineConfiguration(Long engineConfigId) {
-        // Fetch engine config
-        EngineConfig engineConfig = engineConfigRepository.findById(engineConfigId)
-                .orElseThrow(() -> new RuntimeException("Engine config not found with ID: " + engineConfigId));
+        try {
+            // Fetch engine config
+            EngineConfig engineConfig = engineConfigRepository.findById(engineConfigId)
+                    .orElseThrow(() -> new RuntimeException("Engine config not found with ID: " + engineConfigId));
 
-        // Fetch all related data
-        List<ScoringMainCategory> mainCategories = scoringMainCategoryRepository
-                .findByEngineConfigIdOrderByDisplayOrderAsc(engineConfigId);
-        List<ScoringCategoryType> categoryTypes = scoringCategoryTypeRepository.findAll();
-        List<ScoringCategoryConfigMaster> categoryConfigMasters = scoringCategoryConfigMasterRepository
-                .findByEngineConfigId(engineConfigId);
-        List<CreditScoreAdjustmentRules> adjustmentRules = creditScoreAdjustmentRulesRepository
-                .findByEngineConfigIdOrderByDisplayOrderAsc(engineConfigId);
-        List<RiskTierConfig> riskTiers = riskTierConfigRepository.findByEngineConfigId(engineConfigId);
+            // Fetch all related data
+            List<ScoringMainCategory> mainCategories = scoringMainCategoryRepository
+                    .findByEngineConfigIdOrderByDisplayOrderAsc(engineConfigId);
+            List<ScoringCategoryType> categoryTypes = scoringCategoryTypeRepository.findAll();
+            List<ScoringCategoryConfigMaster> categoryConfigMasters = scoringCategoryConfigMasterRepository
+                    .findByEngineConfigId(engineConfigId);
+            List<CreditScoreAdjustmentRules> adjustmentRules = creditScoreAdjustmentRulesRepository
+                    .findByEngineConfigIdOrderByDisplayOrderAsc(engineConfigId);
+            List<RiskTierConfig> riskTiers = riskTierConfigRepository.findByEngineConfigId(engineConfigId);
 
-        // Build DTO
-        return CreditScoreConfigDTO.builder()
-                .engineConfig(mapEngineConfig(engineConfig))
-                .mainCategories(mapMainCategories(mainCategories))
-                .categoryTypes(mapCategoryTypes(categoryTypes))
-                .categoryConfigs(mapCategoryConfigs(categoryConfigMasters))
-                .adjustmentRules(mapAdjustmentRules(adjustmentRules))
-                .riskTiers(mapRiskTiers(riskTiers))
-                .build();
+            // Build DTO
+            return CreditScoreConfigDTO.builder()
+                    .engineConfig(mapEngineConfig(engineConfig))
+                    .mainCategories(mapMainCategories(mainCategories))
+                    .categoryTypes(mapCategoryTypes(categoryTypes))
+                    .categoryConfigs(mapCategoryConfigs(categoryConfigMasters))
+                    .adjustmentRules(mapAdjustmentRules(adjustmentRules))
+                    .riskTiers(mapRiskTiers(riskTiers))
+                    .build();
+        } catch (Exception e) {
+            log.error("Error fetching engine configuration for ID: {}", engineConfigId, e);
+            throw new RuntimeException("Failed to fetch engine configuration: " + e.getMessage(), e);
+        }
     }
 
     private EngineConfigInfo mapEngineConfig(EngineConfig entity) {
@@ -95,11 +118,23 @@ public class CreditScoreConfigService {
     }
 
     private List<CategoryConfigInfo> mapCategoryConfigs(List<ScoringCategoryConfigMaster> entities) {
+        if (entities.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        // Bulk fetch all thresholds for these configs
+        List<Long> configIds = entities.stream().map(ScoringCategoryConfigMaster::getId).collect(Collectors.toList());
+        List<ScoringCategoryConfigThreshold> allThresholds = scoringCategoryConfigThresholdRepository
+                .findByCategoryConfigMasterIdIn(configIds);
+
+        // Group thresholds by config ID
+        Map<Long, List<ScoringCategoryConfigThreshold>> thresholdsByConfigId = allThresholds.stream()
+                .collect(Collectors.groupingBy(t -> t.getCategoryConfigMaster().getId()));
+
         return entities.stream()
                 .map(entity -> {
-                    // Fetch thresholds for this config
-                    List<ScoringCategoryConfigThreshold> thresholds = scoringCategoryConfigThresholdRepository
-                            .findByCategoryConfigMasterId(entity.getId());
+                    List<ScoringCategoryConfigThreshold> thresholds = thresholdsByConfigId.getOrDefault(entity.getId(),
+                            Collections.emptyList());
 
                     return CategoryConfigInfo.builder()
                             .id(entity.getId())
@@ -130,11 +165,23 @@ public class CreditScoreConfigService {
     }
 
     private List<AdjustmentRuleInfo> mapAdjustmentRules(List<CreditScoreAdjustmentRules> entities) {
+        if (entities.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        // Bulk fetch all rule configs
+        List<Long> ruleIds = entities.stream().map(CreditScoreAdjustmentRules::getId).collect(Collectors.toList());
+        List<CreditScoreAdjustmentRulesConfig> allConfigs = creditScoreAdjustmentRulesConfigRepository
+                .findByAdjustmentRulesIdIn(ruleIds);
+
+        // Group configs by rule ID
+        Map<Long, List<CreditScoreAdjustmentRulesConfig>> configsByRuleId = allConfigs.stream()
+                .collect(Collectors.groupingBy(c -> c.getAdjustmentRules().getId()));
+
         return entities.stream()
                 .map(entity -> {
-                    // Fetch rule config (usually 1 per rule)
-                    List<CreditScoreAdjustmentRulesConfig> configs = creditScoreAdjustmentRulesConfigRepository
-                            .findByAdjustmentRulesId(entity.getId());
+                    List<CreditScoreAdjustmentRulesConfig> configs = configsByRuleId.getOrDefault(entity.getId(),
+                            Collections.emptyList());
 
                     RuleConfigInfo configInfo = null;
                     if (!configs.isEmpty()) {

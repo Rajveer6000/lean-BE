@@ -10,4 +10,7 @@ import java.util.List;
 public interface ScoringCategoryConfigThresholdRepository extends JpaRepository<ScoringCategoryConfigThreshold, Long> {
 
     List<ScoringCategoryConfigThreshold> findByCategoryConfigMasterId(Long categoryConfigMasterId);
+
+    List<ScoringCategoryConfigThreshold> findByCategoryConfigMasterIdIn(List<Long> categoryConfigMasterIds);
+
 }
